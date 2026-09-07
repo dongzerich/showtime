@@ -9,12 +9,15 @@ import {
   Descriptions,
   Popconfirm,
   Input,
+  Form,
   message,
 } from 'antd'
 import {
   getAdminOrderList,
   getAdminOrderDetail,
   adminCancelOrder,
+  issueOrderTickets,
+  redeemTicket,
   type AdminOrderSummary,
   type OrderDetail,
   type OrderStatus,
@@ -46,6 +49,10 @@ const Order = () => {
   const [detailVisible, setDetailVisible] = useState(false)
   const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [issueLoading, setIssueLoading] = useState(false)
+  const [redeemVisible, setRedeemVisible] = useState(false)
+  const [redeemLoading, setRedeemLoading] = useState(false)
+  const [redeemForm] = Form.useForm()
 
   const loadData = async (page = 1, pageSize = 10) => {
     setLoading(true)
@@ -102,6 +109,38 @@ const Order = () => {
       loadData(pagination.current, pagination.pageSize)
     } catch {
       message.error('取消订单失败')
+    }
+  }
+
+  const handleIssue = async (orderId: number) => {
+    setIssueLoading(true)
+    try {
+      const res = await issueOrderTickets(orderId)
+      if (res.error || !res.data?.success) {
+        message.error(res.data?.message || '出票失败')
+        return
+      }
+      message.success('出票成功')
+      await loadData(pagination.current, pagination.pageSize)
+      if (detailVisible) await handleViewDetail(orderId)
+    } finally {
+      setIssueLoading(false)
+    }
+  }
+
+  const handleRedeem = async (values: { qrCode: string; checkDevice: string }) => {
+    setRedeemLoading(true)
+    try {
+      const res = await redeemTicket(values)
+      if (res.error || !res.data?.success) {
+        message.error(res.data?.message || '核销失败')
+        return
+      }
+      message.success('核销成功')
+      setRedeemVisible(false)
+      redeemForm.resetFields()
+    } finally {
+      setRedeemLoading(false)
     }
   }
 
@@ -183,6 +222,16 @@ const Order = () => {
               </Button>
             </Popconfirm>
           )}
+          {record.orderStatus === 'PAID' && (
+            <Button type="link" size="small" loading={issueLoading} onClick={() => handleIssue(Number(record.orderId))}>
+              出票
+            </Button>
+          )}
+          {record.orderStatus === 'ISSUED' && (
+            <Button type="link" size="small" onClick={() => setRedeemVisible(true)}>
+              核销
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -240,6 +289,11 @@ const Order = () => {
           <Button key="close" onClick={() => setDetailVisible(false)}>
             关闭
           </Button>,
+          orderDetail?.orderStatus === 'PAID' && (
+            <Button key="issue" type="primary" loading={issueLoading} onClick={() => void handleIssue(Number(orderDetail.orderId))}>
+              出票
+            </Button>
+          ),
         ]}
       >
         {detailLoading ? (
@@ -307,6 +361,24 @@ const Order = () => {
             )}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        title="核销电子票"
+        open={redeemVisible}
+        onCancel={() => setRedeemVisible(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={redeemForm} layout="vertical" onFinish={handleRedeem} initialValues={{ checkDevice: 'admin-web' }}>
+          <Form.Item label="二维码内容" name="qrCode" rules={[{ required: true, message: '请输入或扫描二维码内容' }]}>
+            <Input.TextArea rows={3} placeholder="粘贴电子票二维码内容" />
+          </Form.Item>
+          <Form.Item label="核销设备" name="checkDevice" rules={[{ required: true, message: '请输入核销设备' }]}>
+            <Input />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={redeemLoading} block>确认核销</Button>
+        </Form>
       </Modal>
     </div>
   )

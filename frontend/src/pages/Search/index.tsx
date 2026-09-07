@@ -1,23 +1,54 @@
 import { useState, useEffect } from 'react';
-import { Layout, Menu, Slider, Button, Input, Card, Row, Col, Typography, Divider, Spin, Empty, message, Tag } from 'antd';
+import { Layout, Button, Input, InputNumber, Card, Typography, Divider, Spin, Empty, message, Tag, Select } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Grid } from 'react-window';
 import { showAPI } from '@/api/requests';
-import type { ShowDto } from '@/types/api';
+import { showSessionAPI } from '@/api/requests';
+import type { ShowDto, PricingStrategyDto } from '@/types/api';
 import './Search.css';
 
 const { Sider, Content } = Layout;
 
-// 分类列表（硬编码，后续可以从接口获取）
-const categories = [
-  { id: 0, name: '全部' },
-  { id: 1, name: '演唱会' },
-  { id: 2, name: '话剧' },
-  { id: 3, name: '音乐剧' },
-  { id: 4, name: '体育' },
-];
+type ShowGridCellProps = {
+  shows: ShowDto[];
+  getPoster: (show: ShowDto) => string;
+  navigate: ReturnType<typeof useNavigate>;
+  columnCount: number;
+};
 
-// 城市列表（硬编码，后续可以从接口获取）
-const cities = ['全部', '北京', '上海', '广州', '成都', '杭州'];
+const ShowGridCell = ({
+  columnIndex,
+  rowIndex,
+  style,
+  ariaAttributes,
+  shows,
+  getPoster,
+  navigate,
+  columnCount,
+}: ShowGridCellProps & {
+  columnIndex: number;
+  rowIndex: number;
+  style: React.CSSProperties;
+  ariaAttributes: React.HTMLAttributes<HTMLDivElement>;
+}) => {
+  const show = shows[rowIndex * columnCount + columnIndex];
+  if (!show) return null;
+
+  return (
+    <div {...ariaAttributes} style={{ ...style, padding: '0 8px 16px' }}>
+      <Card
+        hoverable
+        onClick={() => navigate(`/performance/${show.showId}`)}
+        cover={<picture><source srcSet={getPoster(show).replace(/\.(jpe?g|png)$/i, '.webp')} type="image/webp" /><img className="show-poster" loading="lazy" decoding="async" alt={show.showName} src={getPoster(show)} /></picture>}
+      >
+        <Card.Meta
+          title={show.showName}
+          description={<><div className="show-card-description">{show.description?.slice(0, 80) || '暂无简介'}</div><Tag color="green">最低 ¥{Number((show as ShowDto & { minPrice?: number }).minPrice ?? 0).toFixed(0)}</Tag></>}
+        />
+      </Card>
+    </div>
+  );
+};
 
 const Search = () => {
   const navigate = useNavigate();
@@ -27,13 +58,31 @@ const Search = () => {
   // 状态
   const [searchText, setSearchText] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState(0);
-  const [selectedCity, setSelectedCity] = useState('全部');
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([{ id: 0, name: '全部' }]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+  const [appliedPriceRange, setAppliedPriceRange] = useState<[number, number]>([0, 2000]);
   const [shows, setShows] = useState<ShowDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const pageSize = 12;
+  const [columnCount, setColumnCount] = useState(4);
+  const pageSize = 100;
+  const gridRowHeight = columnCount === 4 ? 316 : 376;
+
+  useEffect(() => {
+    const updateColumnCount = () => setColumnCount(window.innerWidth <= 768 ? 2 : 4);
+    updateColumnCount();
+    window.addEventListener('resize', updateColumnCount);
+    return () => window.removeEventListener('resize', updateColumnCount);
+  }, []);
+
+  useEffect(() => {
+    void showAPI.getCategories().then(({ data, error }) => {
+      if (!error && data?.success) {
+        setCategories([{ id: 0, name: '全部' }, ...(data.data || []).map((item) => ({ id: Number(item.categoryId), name: item.categoryName }))]);
+      }
+    });
+  }, []);
 
   // ========== 搜索演出 ==========
   const fetchShows = async (keyword?: string) => {
@@ -61,14 +110,31 @@ const Search = () => {
       }
 
       if (data?.success && data?.data) {
-        const items = (data.data.items || []).map((item: any) => ({
+        const rawItems = (data.data.items || []).map((item: any) => ({
           ...item,
           showId: Number(item.showId),
           categoryId: Number(item.categoryId),
           durationMinutes: item.durationMinutes !== null ? Number(item.durationMinutes) : null,
         }));
-        setShows(items);
-        setTotal(Number(data.data.totalCount || 0));
+        const items = await Promise.all(rawItems.map(async (item: ShowDto) => {
+          const sessions = await showSessionAPI.getShowSessions(item.showId);
+          const prices = await Promise.all((sessions.data?.success ? sessions.data.data || [] : []).map(async (session: any) => {
+            const result = await showSessionAPI.getPricingStrategies(Number(session.sessionId));
+            return result.data?.success ? (result.data.data || []) as PricingStrategyDto[] : [];
+          }));
+          const minPrice = prices.flat().reduce((min, strategy) => Math.min(min, Number(strategy.price)), Number.POSITIVE_INFINITY);
+          return { ...item, minPrice: Number.isFinite(minPrice) ? minPrice : null };
+        }));
+        const filtered = items.filter((item: any) => item.minPrice !== null && item.minPrice >= appliedPriceRange[0] && item.minPrice <= appliedPriceRange[1]);
+        setShows(filtered);
+        setTotal(filtered.length);
+        if (items.length > 0) {
+          const maxPrice = Math.max(2000, ...items.map((item: any) => Number(item.minPrice || 0)));
+          setPriceRange((current) => {
+            const nextMax = Math.max(current[1], maxPrice);
+            return current[1] === nextMax ? current : [current[0], nextMax];
+          });
+        }
         setPage(Number(data.data.page || 1));
       } else {
         message.error(data?.message || '搜索失败');
@@ -84,12 +150,16 @@ const Search = () => {
   // ========== 初始加载 ==========
   useEffect(() => {
     fetchShows(searchText);
-  }, [page, selectedCategory, searchText]);
+  }, [page, selectedCategory, searchText, appliedPriceRange]);
 
   // ========== 搜索按钮 ==========
   const handleSearch = () => {
+    if (priceRange[0] < 0 || priceRange[1] < 0 || priceRange[0] > priceRange[1]) {
+      message.warning('请输入有效的票价范围');
+      return;
+    }
     setPage(1);
-    fetchShows(searchText);
+    setAppliedPriceRange(priceRange);
   };
 
   // ========== 回车搜索 ==========
@@ -102,11 +172,10 @@ const Search = () => {
   // ========== 重置 ==========
   const handleReset = () => {
     setSelectedCategory(0);
-    setSelectedCity('全部');
     setPriceRange([0, 2000]);
+    setAppliedPriceRange([0, 2000]);
     setSearchText('');
     setPage(1);
-    fetchShows('');
   };
 
   // ========== 获取海报图 ==========
@@ -123,54 +192,45 @@ const Search = () => {
 
           {/* 分类 */}
           <div className="filter-group">
-            <div className="filter-label">分类</div>
-            <Menu theme="dark" mode="inline" selectedKeys={[String(selectedCategory)]} onClick={({ key }) => setSelectedCategory(Number(key))}>
-              {categories.map(cat => (
-                <Menu.Item key={String(cat.id)}>{cat.name}</Menu.Item>
-              ))}
-            </Menu>
+            <div className="filter-label">演出类型</div>
+            <Select
+              className="filter-select"
+              value={selectedCategory}
+              onChange={(value) => { setSelectedCategory(value); setPage(1); }}
+              options={categories.map((category) => ({ value: category.id, label: category.name }))}
+            />
           </div>
 
           <Divider style={{ borderColor: '#434343' }} />
 
-          {/* 城市（暂时只做UI） */}
+          {/* 价位 */}
           <div className="filter-group">
-            <div className="filter-label">地点</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {cities.map(city => (
-                <Button
-                  key={city}
-                  size="small"
-                  type={selectedCity === city ? 'primary' : 'default'}
-                  onClick={() => setSelectedCity(city)}
-                  style={{ marginBottom: 4 }}
-                >
-                  {city}
-                </Button>
-              ))}
+            <div className="filter-label">最低票价范围</div>
+            <div className="price-inputs">
+              <InputNumber
+                min={0}
+                precision={0}
+                value={priceRange[0]}
+                onChange={(value) => setPriceRange([value ?? 0, priceRange[1]])}
+                prefix="¥"
+                placeholder="最低"
+              />
+              <span className="price-separator">至</span>
+              <InputNumber
+                min={0}
+                precision={0}
+                value={priceRange[1]}
+                onChange={(value) => setPriceRange([priceRange[0], value ?? 0])}
+                prefix="¥"
+                placeholder="最高"
+              />
             </div>
           </div>
 
           <Divider style={{ borderColor: '#434343' }} />
 
-          {/* 价位（暂时只做UI） */}
-          <div className="filter-group">
-            <div className="filter-label">价位范围</div>
-            <Slider
-              range
-              min={0}
-              max={2000}
-              step={50}
-              value={priceRange}
-              onChange={(val) => setPriceRange(val as [number, number])}
-            />
-            <div style={{ color: 'white' }}>¥{priceRange[0]} - ¥{priceRange[1]}</div>
-          </div>
-
-          <Divider style={{ borderColor: '#434343' }} />
-
           <Button type="primary" block size="large" onClick={handleSearch} style={{ background: '#ff4d4f', border: 'none' }}>
-            应用筛选 & 搜索
+            应用筛选
           </Button>
           <Button block size="large" onClick={handleReset} style={{ marginTop: 8 }}>
             重置
@@ -202,37 +262,24 @@ const Search = () => {
 
           <Spin spinning={loading}>
             {shows.length > 0 ? (
-              <Row gutter={[24, 24]}>
-                {shows.map((show) => (
-                  <Col key={show.showId} xs={24} sm={12} md={8} lg={6}>
-                    <Card
-                      hoverable
-                      cover={<img alt={show.showName} src={getPoster(show)} style={{ height: 180, objectFit: 'cover' }} />}
-                      onClick={() => navigate(`/performance/${show.showId}`)}
-                    >
-                      <Card.Meta
-                        title={show.showName}
-                        description={
-                          <div>
-                            <div>{show.description?.slice(0, 30) || '暂无简介'}</div>
-                            <div style={{ marginTop: 8 }}>
-                              <Tag color={show.status === 'PUBLISHED' ? 'green' : 'orange'}>
-                                {show.status || '未知'}
-                              </Tag>
-                            </div>
-                          </div>
-                        }
-                      />
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
+              <Grid<ShowGridCellProps>
+                columnCount={columnCount}
+                columnWidth={`${100 / columnCount}%`}
+                rowCount={Math.ceil(shows.length / columnCount)}
+                  rowHeight={gridRowHeight}
+                overscanCount={2}
+                cellComponent={ShowGridCell}
+                cellProps={{ shows, getPoster, navigate, columnCount }}
+                defaultHeight={Math.min(720, Math.max(gridRowHeight, Math.ceil(shows.length / columnCount) * gridRowHeight))}
+                style={{ height: Math.min(720, Math.max(gridRowHeight, Math.ceil(shows.length / columnCount) * gridRowHeight)), width: '100%' }}
+                className="show-grid"
+              />
             ) : (
               !loading && <Empty description="没有找到符合条件的演出" />
             )}
           </Spin>
 
-          {/* 简单分页（加载更多） */}
+          {/* 简单分页 */}
           {total > pageSize && (
             <div style={{ textAlign: 'center', marginTop: 24 }}>
               <Button

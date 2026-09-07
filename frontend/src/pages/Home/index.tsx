@@ -149,6 +149,8 @@ const Home = () => {
                   cover={
                     <img
                       alt={show.showName}
+                      loading="lazy"
+                      decoding="async"
                       src={getPoster(show)}
                       style={{ height: 200, objectFit: 'cover' }}
                     />
@@ -186,6 +188,8 @@ const Home = () => {
                   cover={
                     <img
                       alt={show.showName}
+                      loading="lazy"
+                      decoding="async"
                       src={getPoster(show)}
                       style={{ height: 180, objectFit: 'cover' }}
                     />

@@ -218,6 +218,11 @@ export const issueOrderTickets = (orderId: number) => {
   });
 };
 
+// 管理端：核销电子票
+export const redeemTicket = (data: components['schemas']['RedeemTicketRequest']) => {
+  return client.POST('/api/admin/tickets/redeem', { body: data });
+};
+
 // ========== 营销内容相关 ==========
 export type MarketingContentType = components['schemas']['MarketingContentType'];
 export type MarketingContentStatus = components['schemas']['MarketingContentStatus'];

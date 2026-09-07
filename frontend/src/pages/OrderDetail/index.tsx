@@ -83,7 +83,7 @@ interface ExchangeTargetSeat {
 }
 
 const OrderDetail = () => {
-  const { orderId } = useParams<{ orderId: string }>();
+  const { id: orderId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [order, setOrder] = useState<OrderResponse | null>(null);
@@ -632,6 +632,8 @@ const OrderDetail = () => {
                 <img
                   src={showDetail.posterUrl}
                   alt={showDetail.showName}
+                  loading="lazy"
+                  decoding="async"
                   style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }}
                 />
               )}
@@ -730,7 +732,7 @@ const OrderDetail = () => {
                     </Tag>
                   </div>
                   {ticket.qrCode && (
-                    <img src={ticket.qrCode} alt="二维码" className="ticket-qr" />
+                    <img src={ticket.qrCode} alt="二维码" loading="lazy" decoding="async" className="ticket-qr" />
                   )}
                 </div>
               ))}
