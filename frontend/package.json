@@ -11,14 +11,16 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
+    "@microsoft/signalr": "^10.0.11",
     "antd": "^6.5.2",
-    "axios": "^1.18.1",
+    "echarts": "^6.1.0",
     "openapi-fetch": "^0.17.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

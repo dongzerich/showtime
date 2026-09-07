@@ -12,10 +12,14 @@ public sealed partial class AuthService(
     AppDbContext dbContext,
     IPasswordHasher<SysUser> passwordHasher,
     IJwtTokenService jwtTokenService,
+    IUserSessionService userSessionService,
     TimeProvider timeProvider,
     ILogger<AuthService> logger) : IAuthService
 {
     private const string DefaultRoleCode = "USER";
+
+    /// <summary>头像 URL 长度上限，与 SYS_USER.AVATAR_URL VARCHAR2(500 CHAR) 一致。</summary>
+    private const int MaxAvatarUrlLength = 500;
 
     public async Task<AuthServiceResult<RegisterResponse>> RegisterAsync(
         RegisterRequest request,
@@ -108,6 +112,7 @@ public sealed partial class AuthService(
 
     public async Task<AuthServiceResult<LoginResponse>> LoginAsync(
         LoginRequest request,
+        ClientRequestMetadata client,
         CancellationToken cancellationToken)
     {
         var account = request.Account.Trim();
@@ -179,7 +184,21 @@ public sealed partial class AuthService(
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        var token = jwtTokenService.CreateToken(user, roleCodes);
+        var sessionResult = await userSessionService.StartAsync(
+            user.UserId,
+            client,
+            cancellationToken);
+        if (!sessionResult.IsSuccess)
+        {
+            return AuthServiceResult<LoginResponse>.Failed(
+                AuthFailure.SessionUnavailable);
+        }
+
+        var session = sessionResult.Value!;
+        var token = jwtTokenService.CreateToken(
+            user,
+            roleCodes,
+            session.SessionId);
         var expiresIn = Math.Max(
             0,
             (long)Math.Ceiling(
@@ -190,9 +209,45 @@ public sealed partial class AuthService(
             "Bearer",
             expiresIn,
             token.ExpiresAtUtc,
+            session.RefreshToken,
+            session.RefreshTokenExpiresAtUtc,
             CreateUserResponse(user, roleCodes));
 
         return AuthServiceResult<LoginResponse>.Succeeded(response);
+    }
+
+    public async Task<AuthServiceResult<RefreshTokenResponse>> RefreshAsync(
+        RefreshTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        var sessionResult = await userSessionService.RotateAsync(
+            request.RefreshToken,
+            cancellationToken);
+        if (!sessionResult.IsSuccess)
+        {
+            return AuthServiceResult<RefreshTokenResponse>.Failed(
+                MapSessionFailure(sessionResult.Failure));
+        }
+
+        var session = sessionResult.Value!;
+        var accessToken = jwtTokenService.CreateToken(
+            session.User,
+            session.RoleCodes,
+            session.SessionId);
+        var expiresIn = Math.Max(
+            0,
+            (long)Math.Ceiling(
+                (accessToken.ExpiresAtUtc - timeProvider.GetUtcNow().UtcDateTime)
+                .TotalSeconds));
+
+        return AuthServiceResult<RefreshTokenResponse>.Succeeded(
+            new RefreshTokenResponse(
+                accessToken.AccessToken,
+                "Bearer",
+                expiresIn,
+                accessToken.ExpiresAtUtc,
+                session.RefreshToken,
+                session.RefreshTokenExpiresAtUtc));
     }
 
     private async Task<AuthFailure> FindRegistrationConflictAsync(
@@ -227,6 +282,49 @@ public sealed partial class AuthService(
         return AuthFailure.None;
     }
 
+    public async Task<AuthServiceResult<UserResponse>> UpdateAvatarAsync(
+        long userId,
+        string avatarUrl,
+        CancellationToken cancellationToken)
+    {
+        var normalized = avatarUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized)
+            || normalized.Length > MaxAvatarUrlLength
+            || !Uri.TryCreate(normalized, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp
+                && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return AuthServiceResult<UserResponse>.Failed(
+                AuthFailure.InvalidAvatarUrl);
+        }
+
+        var user = await dbContext.Set<SysUser>()
+            .Include(user => user.UserRoles)
+            .ThenInclude(userRole => userRole.Role)
+            .SingleOrDefaultAsync(
+                user => user.UserId == userId,
+                cancellationToken);
+        if (user is null)
+        {
+            return AuthServiceResult<UserResponse>.Failed(
+                AuthFailure.UserNotFound);
+        }
+
+        user.AvatarUrl = normalized;
+        user.UpdateBy = userId.ToString();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var roleCodes = user.UserRoles
+            .Where(userRole => userRole.Role.Status)
+            .Select(userRole => userRole.Role.RoleCode)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        return AuthServiceResult<UserResponse>.Succeeded(
+            CreateUserResponse(user, roleCodes));
+    }
+
     private static UserResponse CreateUserResponse(
         SysUser user,
         IReadOnlyList<string> roleCodes) =>
@@ -236,7 +334,8 @@ public sealed partial class AuthService(
             user.Nickname,
             user.Phone,
             user.Email,
-            roleCodes);
+            roleCodes,
+            user.AvatarUrl);
 
     private static string? NormalizeOptionalEmail(string? value)
     {
@@ -249,6 +348,17 @@ public sealed partial class AuthService(
         var normalized = value?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
+
+    private static AuthFailure MapSessionFailure(UserSessionFailure failure) =>
+        failure switch
+        {
+            UserSessionFailure.Expired => AuthFailure.RefreshTokenExpired,
+            UserSessionFailure.LoggedOut => AuthFailure.RefreshTokenLoggedOut,
+            UserSessionFailure.Locked => AuthFailure.RefreshTokenLocked,
+            UserSessionFailure.TokenReused => AuthFailure.RefreshTokenReused,
+            UserSessionFailure.AccountUnavailable => AuthFailure.AccountDisabled,
+            _ => AuthFailure.InvalidRefreshToken,
+        };
 
     [GeneratedRegex(@"^(?:\+?[0-9]{6,19}|[0-9]{20})$")]
     private static partial Regex PhoneRegex();

@@ -52,6 +52,31 @@ public sealed class OpenApiTests
     }
 
     [Fact]
+    public async Task OpenApiDocument_DeclaresRequiredOrderIdempotencyHeader()
+    {
+        using var factory = new AuthTestFactory();
+        using var client = factory.CreateApiClient();
+
+        var response = await client.GetAsync("/openapi/v1.json");
+
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        var parameters = document.RootElement
+            .GetProperty("paths")
+            .GetProperty("/api/orders")
+            .GetProperty("post")
+            .GetProperty("parameters");
+        var parameter = Assert.Single(parameters.EnumerateArray());
+        Assert.Equal("Idempotency-Key", parameter.GetProperty("name").GetString());
+        Assert.Equal("header", parameter.GetProperty("in").GetString());
+        Assert.True(parameter.GetProperty("required").GetBoolean());
+        var schema = parameter.GetProperty("schema");
+        Assert.Equal("string", schema.GetProperty("type").GetString());
+        Assert.Equal(64, schema.GetProperty("maxLength").GetInt32());
+    }
+
+    [Fact]
     public async Task OpenApiDocument_DeclaresSeatBatchUpdateContract()
     {
         using var factory = new AuthTestFactory();
@@ -139,6 +164,54 @@ public sealed class OpenApiTests
     }
 
     [Fact]
+    public async Task OpenApiDocument_DeclaresTicketRedemptionContract()
+    {
+        using var factory = new AuthTestFactory();
+        using var client = factory.CreateApiClient();
+
+        using var document = JsonDocument.Parse(
+            await client.GetStringAsync("/openapi/v1.json"));
+        var root = document.RootElement;
+        var paths = root.GetProperty("paths");
+        var operation = paths
+            .GetProperty("/api/admin/tickets/redeem")
+            .GetProperty("post");
+        var schemas = root.GetProperty("components").GetProperty("schemas");
+        var requestSchema = schemas.GetProperty("RedeemTicketRequest");
+        var required = requestSchema.GetProperty("required")
+            .EnumerateArray()
+            .Select(item => item.GetString())
+            .ToHashSet();
+
+        Assert.Contains("qrCode", required);
+        Assert.Contains("checkDevice", required);
+        var qrCode = requestSchema.GetProperty("properties").GetProperty("qrCode");
+        var checkDevice = requestSchema.GetProperty("properties").GetProperty("checkDevice");
+        Assert.Equal("string", qrCode.GetProperty("type").GetString());
+        Assert.Equal(255, qrCode.GetProperty("maxLength").GetInt32());
+        Assert.Equal("string", checkDevice.GetProperty("type").GetString());
+        Assert.Equal(100, checkDevice.GetProperty("maxLength").GetInt32());
+        AssertResponseCodes(operation, "200", "400", "401", "403", "404", "409", "500");
+        AssertSecurityApplied(
+            paths,
+            "/api/admin/tickets/redeem",
+            "post",
+            expectApplied: true);
+        AssertSchemaProperties(
+            schemas,
+            "TicketRedemptionResponse",
+            "eTicketId",
+            "eTicketNo",
+            "orderId",
+            "orderItemId",
+            "sessionId",
+            "ticketStatus",
+            "checkTime",
+            "checkDevice",
+            "checkBy");
+    }
+
+    [Fact]
     public async Task OpenApiDocument_DeclaresRefundWorkflowContracts()
     {
         using var factory = new AuthTestFactory();
@@ -208,7 +281,7 @@ public sealed class OpenApiTests
             schemas,
             "RefundItemResponse",
             "ticketStatus",
-            ["UNUSED", "REFUNDING", "USED", "REFUNDED", "EXCHANGED"]);
+            ["UNUSED", "REFUNDING", "USED", "REFUNDED", "EXCHANGING", "EXCHANGED"]);
         AssertQueryParameterEnumValues(
             paths,
             schemas,
@@ -359,6 +432,94 @@ public sealed class OpenApiTests
             "patch",
             "RefundPolicyResponse",
             "200", "400", "401", "403", "404");
+    }
+
+    [Fact]
+    public async Task OpenApiDocument_DeclaresExchangeWorkflowContracts()
+    {
+        using var factory = new AuthTestFactory();
+        using var client = factory.CreateApiClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json"));
+        var root = document.RootElement;
+        var paths = root.GetProperty("paths");
+        var schemas = root.GetProperty("components").GetProperty("schemas");
+
+        (string Path, string Method)[] operations =
+        [
+            ("/api/orders/{orderId}/exchanges/quote", "post"),
+            ("/api/orders/{orderId}/exchanges", "post"),
+            ("/api/orders/{orderId}/exchanges", "get"),
+            ("/api/exchanges/{exchangeId}", "get"),
+            ("/api/exchanges/{exchangeId}/pay", "post"),
+            ("/api/admin/exchanges", "get"),
+            ("/api/admin/exchanges/{exchangeId}", "get"),
+            ("/api/admin/exchanges/{exchangeId}/reject", "post"),
+            ("/api/admin/exchanges/{exchangeId}/approve", "post"),
+            ("/api/admin/exchange-policies", "get"),
+            ("/api/admin/exchange-policies", "post"),
+            ("/api/admin/exchange-policies/{policyId}", "put"),
+            ("/api/admin/exchange-policies/{policyId}/status", "patch"),
+        ];
+        foreach (var operation in operations)
+        {
+            AssertOperationExists(paths, operation.Path, operation.Method);
+            AssertSecurityApplied(paths, operation.Path, operation.Method, expectApplied: true);
+        }
+
+        AssertSchemaProperties(schemas, "ExchangeQuoteResponse",
+            "quotedAt", "orderId", "origSessionId", "targetSessionId", "origDeduction",
+            "targetAmount", "priceDiff", "exchangeFee", "amountDue", "appliedPolicyId",
+            "policyName", "items");
+        AssertSchemaProperties(schemas, "ExchangeResponse",
+            "exchangeId", "exchangeNo", "originalOrderId", "childOrderId", "userId",
+            "origSessionId", "targetSessionId", "origDeduction", "targetAmount", "priceDiff",
+            "exchangeFee", "amountDue", "approveStatus", "exchangeStatus", "expireTime", "items");
+        AssertEnumValues(schemas, "ExchangeResponse", "approveStatus",
+            ["PENDING", "APPROVED", "REJECTED"]);
+        AssertEnumValues(schemas, "ExchangeResponse", "exchangeStatus",
+            ["PENDING", "PROCESSING", "COMPLETED", "FAILED"]);
+        AssertSchemaProperties(schemas, "OrderResponse",
+            "orderType", "parentOrderId", "canPay", "canCancel");
+
+        AssertApiResponseContract(paths, schemas,
+            "/api/orders/{orderId}/exchanges/quote", "post",
+            "ExchangeQuoteResponse", "200", "400", "401", "404", "409");
+        AssertApiResponseContract(paths, schemas,
+            "/api/orders/{orderId}/exchanges", "post",
+            "ExchangeResponse", "201", "400", "401", "404", "409");
+        AssertApiResponseContract(paths, schemas,
+            "/api/orders/{orderId}/exchanges", "get",
+            "PagedExchangeResponse", "200", "400", "401", "404");
+        AssertApiResponseContract(paths, schemas,
+            "/api/exchanges/{exchangeId}", "get",
+            "ExchangeResponse", "200", "401", "404", "409");
+        AssertApiResponseContract(paths, schemas,
+            "/api/exchanges/{exchangeId}/pay", "post",
+            "ExchangePaymentResponse", "200", "400", "401", "404", "409");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchanges", "get",
+            "PagedExchangeResponse", "200", "400", "401", "403");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchanges/{exchangeId}", "get",
+            "ExchangeResponse", "200", "401", "403", "404", "409");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchanges/{exchangeId}/reject", "post",
+            "ExchangeResponse", "200", "400", "401", "403", "404", "409");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchanges/{exchangeId}/approve", "post",
+            "ExchangeResponse", "200", "400", "401", "403", "404", "409");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchange-policies", "get",
+            "PagedExchangePolicyResponse", "200", "400", "401", "403");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchange-policies", "post",
+            "ExchangePolicyResponse", "201", "400", "401", "403", "404");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchange-policies/{policyId}", "put",
+            "ExchangePolicyResponse", "200", "400", "401", "403", "404");
+        AssertApiResponseContract(paths, schemas,
+            "/api/admin/exchange-policies/{policyId}/status", "patch",
+            "ExchangePolicyResponse", "200", "400", "401", "403", "404");
     }
 
     private static void AssertSecurityApplied(
