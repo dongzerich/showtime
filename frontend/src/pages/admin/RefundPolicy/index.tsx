@@ -121,8 +121,9 @@ const RefundPolicy = () => {
       message.success(editingItem ? '策略已更新' : '策略已创建')
       setModalVisible(false)
       loadData(pagination.current, pagination.pageSize)
-    } catch {
-      // 表单校验失败或保存异常，均由 antd / 中间件提示
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存失败')
     } finally {
       setSaving(false)
     }

@@ -136,6 +136,14 @@ const Session = () => {
         priority: Number(r.priority ?? 0),
         seatSectionId: r.seatSectionId == null ? null : Number(r.seatSectionId),
       }))
+      // 对齐后端校验：时间窗口为“开演前分钟数”，须满足起始 >= 结束
+      const invalid = rules.find(
+        r => r.startOffsetMinutes != null && r.endOffsetMinutes != null && r.startOffsetMinutes < r.endOffsetMinutes,
+      )
+      if (invalid) {
+        message.error(`规则「${invalid.ruleName}」时间窗口无效：起始偏移(${invalid.startOffsetMinutes}) 必须大于等于结束偏移(${invalid.endOffsetMinutes})`)
+        return
+      }
       setPricingSaving(true)
       const res = await configureDynamicPricingRules(Number(currentSession.sessionId), rules)
       if (res.error) {
@@ -144,8 +152,9 @@ const Session = () => {
       }
       message.success('动态定价规则已保存（整批覆盖）')
       setPricingVisible(false)
-    } catch {
-      // 表单校验失败或保存异常，均由 antd / 中间件提示
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存失败')
     } finally {
       setPricingSaving(false)
     }
@@ -350,6 +359,8 @@ const Session = () => {
       >
         <div style={{ marginBottom: 12 }}>
           <Tag color="gold">提示</Tag> 本接口为整批覆盖：保存时将替换该场次全部动态定价规则（传空数组即清空）。请先填写需要保留的全部规则。
+          <br />
+          <Tag color="blue">时间窗口</Tag> 偏移为“距开演前分钟数”，须满足 起始偏移 ≥ 结束偏移，例：开演前 120~30 分钟 → 起始 120、结束 30（120=开场前 2 小时）。
           <br />
           <Tag color="warning">INVENTORY_RATE</Tag> 触发类型当前版本评估恒为 false，建议使用 <Tag color="processing">TIME_WINDOW</Tag>。
         </div>

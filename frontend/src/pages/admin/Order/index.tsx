@@ -92,15 +92,22 @@ const Order = () => {
     setOrderDetail(null)
     setRelatedRefunds([])
     setRelatedExchanges([])
+    // 主详情与关联售后单分离：任一关联单接口异常不影响订单详情展示
     try {
-      const [orderRes, refundRes, exchangeRes] = await Promise.all([
-        getAdminOrderDetail(orderId),
-        getRefundList({ OrderId: orderId, PageSize: 20 }),
-        getExchangeList({ OriginalOrderId: orderId, PageSize: 20 }),
-      ])
+      const orderRes = await getAdminOrderDetail(orderId)
       if (orderRes.data?.data) {
         setOrderDetail(orderRes.data.data)
       }
+    } catch {
+      message.error('加载订单详情失败')
+    } finally {
+      setDetailLoading(false)
+    }
+    try {
+      const [refundRes, exchangeRes] = await Promise.all([
+        getRefundList({ OrderId: orderId, PageSize: 20 }),
+        getExchangeList({ OriginalOrderId: orderId, PageSize: 20 }),
+      ])
       if (refundRes.data?.data) {
         setRelatedRefunds(refundRes.data.data.items || [])
       }
@@ -108,9 +115,7 @@ const Order = () => {
         setRelatedExchanges(exchangeRes.data.data.items || [])
       }
     } catch {
-      message.error('加载订单详情失败')
-    } finally {
-      setDetailLoading(false)
+      // 关联退票/改签单加载失败不阻断主详情
     }
   }
 

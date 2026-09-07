@@ -161,8 +161,9 @@ const SeatRule = () => {
       message.success(editingItem ? '规则已更新' : '规则已创建')
       setModalVisible(false)
       loadData(pagination.current, pagination.pageSize)
-    } catch {
-      // 表单校验失败或保存异常，均由 antd / 中间件提示
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存失败')
     } finally {
       setSaving(false)
     }
@@ -246,8 +247,9 @@ const SeatRule = () => {
       message.success('作用域已添加')
       setScopeAddVisible(false)
       openScopes(scopeRule)
-    } catch {
-      // 表单校验失败或保存异常，均由 antd / 中间件提示
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('添加失败')
     } finally {
       setScopeSaving(false)
     }

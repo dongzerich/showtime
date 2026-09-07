@@ -88,27 +88,27 @@ const SeatMapEditor = () => {
 
   const loadAppliedRules = useCallback(async (mapId: number | null, sectionId: number | null) => {
     if (!mapId) {
-      setAppliedRuleNames([])
-      return
+      setAppliedRuleNames([]);
+      return;
     }
     try {
-      const rulesRes = await getSeatRuleList({ RuleStatus: 'ENABLED', PageSize: 100 })
-      const rules = rulesRes.data?.data?.items || []
-      const names: string[] = []
+      const rulesRes = await getSeatRuleList({ RuleStatus: 'ENABLED', PageSize: 100 });
+      const rules = rulesRes.data?.data?.items || [];
+      const names: string[] = [];
       for (const rule of rules) {
-        const scopesRes = await getSeatRuleScopes(Number(rule.seatRuleId))
-        const scopes: SeatRuleScope[] = scopesRes.data?.data || []
+        const scopesRes = await getSeatRuleScopes(Number(rule.seatRuleId));
+        const scopes: SeatRuleScope[] = scopesRes.data?.data || [];
         const hit = scopes.some(scope =>
           (scope.scopeType === 'MAP' && Number(scope.seatMapId) === mapId) ||
           (scope.scopeType === 'SECTION' && sectionId != null && Number(scope.seatSectionId) === sectionId),
-        )
-        if (hit) names.push(rule.ruleName)
+        );
+        if (hit) names.push(rule.ruleName);
       }
-      setAppliedRuleNames(names)
+      setAppliedRuleNames(names);
     } catch {
-      setAppliedRuleNames([])
+      setAppliedRuleNames([]);
     }
-  }, [])
+  }, []);
 
   const handleMapChange = useCallback((mapId: number) => {
     setSelectedMapId(mapId);
