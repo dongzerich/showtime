@@ -77,7 +77,7 @@ const OrderRow = ({ index, style, ariaAttributes, orders, onOpenPayment, onCance
                 <Button size="small" danger onClick={() => onCancel(order.orderId)}>取消</Button>
               </>
             )}
-            <Button type="link" size="small" onClick={() => onOpenDetail(order.orderId)}>详情</Button>
+            <Button type="link" size="small" onClick={() => onOpenDetail(order.orderId)}>查看详情</Button>
           </div>
         </div>
       </Card>
