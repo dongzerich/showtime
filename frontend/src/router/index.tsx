@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import Layout from '../components/Layout';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
@@ -49,6 +50,12 @@ const withSuspense = (Component: React.ComponentType) => (
   </Suspense>
 );
 
+const RequireAuth = ({ children }: { children: ReactNode }) => (
+  localStorage.getItem('accessToken')
+    ? children
+    : <Navigate to="/login" replace />
+);
+
 const router = createBrowserRouter([
   // ========== 客户端路由：带顶部导航栏 ==========
   {
@@ -58,7 +65,7 @@ const router = createBrowserRouter([
       { index: true, element: withSuspense(Home) },
       { path: 'search', element: withSuspense(Search) },
       { path: 'order', element: withSuspense(Order) },
-      { path: 'order/:orderId', element: <OrderDetail /> },
+      { path: 'order/:id', element: <OrderDetail /> },
       { path: 'performance/:id', element: withSuspense(PerformanceDetail) },
       { path: 'seat-selection/:eventId', element: withSuspense(SeatSelection) },
     ],
@@ -75,7 +82,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/usercenter',
-    element: withSuspense(UserCenter),
+    element: <RequireAuth>{withSuspense(UserCenter)}</RequireAuth>,
   },
 
   // ========== 管理端路由 ==========
