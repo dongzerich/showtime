@@ -8,6 +8,12 @@ import {
   AppstoreOutlined,
   DashboardOutlined,
   NotificationOutlined,
+  RollbackOutlined,
+  SwapOutlined,
+  FileTextOutlined,
+  FileSyncOutlined,
+  ControlOutlined,
+  QrcodeOutlined,
 } from '@ant-design/icons'
 
 const { Sider, Content } = Layout
@@ -36,6 +42,36 @@ const AdminLayout = () => {
       key: '/admin/order',
       icon: <ShoppingCartOutlined />,
       label: '订单管理',
+    },
+    {
+      key: '/admin/refund',
+      icon: <RollbackOutlined />,
+      label: '退票审核',
+    },
+    {
+      key: '/admin/exchange',
+      icon: <SwapOutlined />,
+      label: '改签审核',
+    },
+    {
+      key: '/admin/refund-policy',
+      icon: <FileTextOutlined />,
+      label: '退票策略',
+    },
+    {
+      key: '/admin/exchange-policy',
+      icon: <FileSyncOutlined />,
+      label: '改签策略',
+    },
+    {
+      key: '/admin/seat-rule',
+      icon: <ControlOutlined />,
+      label: '座位规则',
+    },
+    {
+      key: '/admin/redeem',
+      icon: <QrcodeOutlined />,
+      label: '电子票核销',
     },
     {
       key: '/admin/publish',

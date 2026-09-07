@@ -13,6 +13,12 @@ import Publish from '../pages/admin/Publish';
 import SeatMapEditor from '../pages/admin/SeatMap';
 import Dashboard from '../pages/admin/Dashboard';
 import Marketing from '../pages/admin/Marketing';
+import Refund from '../pages/admin/Refund';
+import Exchange from '../pages/admin/Exchange';
+import RefundPolicy from '../pages/admin/RefundPolicy';
+import ExchangePolicy from '../pages/admin/ExchangePolicy';
+import SeatRule from '../pages/admin/SeatRule';
+import Redeem from '../pages/admin/Redeem';
 
 // ========== 客户端页面懒加载 ==========
 const Home = lazy(() => import('../pages/Home'));
@@ -82,6 +88,12 @@ const router = createBrowserRouter([
       { path: 'performance', element: <Performance /> },
       { path: 'session', element: <Session /> },
       { path: 'order', element: <AdminOrder /> },
+      { path: 'refund', element: <Refund /> },
+      { path: 'exchange', element: <Exchange /> },
+      { path: 'refund-policy', element: <RefundPolicy /> },
+      { path: 'exchange-policy', element: <ExchangePolicy /> },
+      { path: 'seat-rule', element: <SeatRule /> },
+      { path: 'redeem', element: <Redeem /> },
       { path: 'publish', element: <Publish /> },
       { path: 'seat-map', element: <SeatMapEditor /> },
       { path: 'marketing', element: <Marketing /> },
