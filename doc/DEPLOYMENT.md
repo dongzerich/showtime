@@ -1,4 +1,4 @@
-# SHOWTIME 部署文档
+﻿# SHOWTIME 部署文档
 
 本文档说明 SHOWTIME 项目从本地开发到生产部署的完整流程，包含环境依赖、配置项清单、数据库初始化、后端与前端部署、反向代理及常见问题排查。
 
@@ -14,7 +14,6 @@
 4. [本地开发部署](#4-本地开发部署)
 5. [生产部署骨架](#5-生产部署骨架)
 6. [常见问题排查](#6-常见问题排查)
-7. [阿里云 OSS 配置](#7-阿里云-oss-配置)
 
 ---
 
@@ -28,13 +27,12 @@
 | Oracle 数据库 | **21c XE** | 数据存储 | 项目连接：`120.27.157.163:1521/XEPDB1` |
 | Git | 2.x | 版本控制 | 遵循 [CONVENTIONS.md](../CONVENTIONS.md) 的分支规范 |
 
-**可选依赖**（其中 Redis / RabbitMQ / OSS 已引入仓库，默认关闭或可降级，不阻塞其他功能）：
+**可选依赖**（尚未在仓库中引入，属规划能力）：
 
 | 软件 | 用途 | 状态 |
 |------|------|------|
-| Redis | 选座分布式锁（防超卖） | 已引入；本地 `docker compose up -d redis` 一键起，不可用时自动降级为纯 Oracle 流程（见 CONVENTIONS.md 第 3 节） |
-| 阿里云 OSS | 图片资源（演出海报/头像等）存储 | 已引入；未启用时 `Oss:Enabled=false`，不影响其他功能；配置见第 7 节 |
-| RabbitMQ | 订单异步通知 / 退款异步完成 | 已引入；**默认关闭**（`RabbitMq:Enabled=false`）时由进程内 outbox 处理，退款与实时通知照常可用；启用方法见第 4.3 节 |
+| Redis | 选座分布式锁（防超卖） | 规划中（PLAN 第 4 周） |
+| RabbitMQ | 订单状态异步通知 | 规划中（PLAN 第 5 周） |
 | Loki + Grafana | 日志监控看板 | 规划中（PLAN 第 5 周） |
 
 ---
@@ -113,7 +111,6 @@ sqlplus deploy_user/密码@//120.27.157.163:1521/XEPDB1 @db/baseline/merged_ddl.
 历史增量脚本位于 `db/migrations/`，按 `日期__模块描述.sql` 命名，例如：
 
 - `20260726__order_ticket_change.sql` —— 订单模块结构调整
-- `20260827__sys_user_avatar_url.sql` —— SYS_USER 新增头像列 AVATAR_URL（用户头像持久化）
 
 新增变更时，约定流程为：**讨论 → 编写 Alter 脚本 → 存入 `db/migrations/` → 由 `DEPLOY_USER` 执行**。
 
@@ -171,24 +168,6 @@ npm run dev       # 启动开发服务器（默认 http://localhost:5173）
 | `npm run build` | 类型检查 + 生产构建（产物在 `dist/`） |
 | `npm run preview` | 本地预览生产构建 |
 | `npm run lint` | Oxlint 代码检查 |
-
-### 4.3 RabbitMQ（可选，默认关闭）
-
-RabbitMQ 仅用于**跨进程/多实例**的可靠异步通知与退款完成。默认配置 `RabbitMq:Enabled=false` 时后端不连接 broker，订单/退款 outbox 由**进程内** `LocalOrderEventPublisher` 直接处理，退款完成与 SignalR 实时通知照常可用，单机部署无需 RabbitMQ。
-
-需要消息队列时（本地联调 / 多实例部署）：
-
-```bash
-# 1. 一键起本地 broker（管理台 http://localhost:15672 ，guest/guest）
-docker compose up -d rabbitmq
-docker compose ps               # showtime-rabbitmq 健康后即可
-
-# 2. 开启后端消息通道（开发环境）
-dotnet user-secrets set "RabbitMq:Enabled" "true"
-# 或环境变量注入：RabbitMq__Enabled=true
-```
-
-连接串 `ConnectionStrings:RabbitMq` 本地默认 `amqp://guest:guest@localhost:5672/`（已内置在 `backend/appsettings.Development.json`）；生产通过环境变量 `ConnectionStrings__RabbitMq` 注入。启用后的链路：approve 退款 → outbox → broker → 消费 Worker 完成退款并推送 `RefundStatusChanged` 通知。
 
 ---
 
@@ -302,78 +281,3 @@ server {
 | 前端详情页打不开 | 缺少 `orderId` 路由 | 补充 `/order/:orderId` 路由（见 [API.md](API.md) 5.5 节） |
 | `dotnet` 找不到 10.0 | SDK 版本不符 | 安装 .NET SDK 10.0 |
 | 建表后查询不到表 | Schema 不一致 | 确认当前 Schema 为 `APP_OWNER`，必要时 `ALTER SESSION SET CURRENT_SCHEMA = APP_OWNER` |
-| 上传图片返回 `403 AccessDenied` | Bucket 未设为公共读 | 控制台把该 Bucket 读写权限改为**公共读（Public Read）** |
-| 上传返回 `NoSuchBucket` | Bucket 不存在，或与 Endpoint 地域不一致 | 核对 Bucket 名称与 Region（Endpoint 必须与 Bucket 同 Region） |
-| 上传接口返回 `503 FILE_STORAGE_NOT_CONFIGURED` | `Oss:Enabled=false` 且 `LocalStorage:Enabled=false`（均未启用） | 联调/上线时置 `Oss:Enabled=true` 并配置 Endpoint/Bucket/BaseUrl/AccessKey；本地开发无需 OSS，Development 默认走本地磁盘存储 `LocalStorage:Enabled=true` |
-| 头像保存报 `ORA-00904: AVATAR_URL` | 头像迁移脚本未执行 | 由 DEPLOY_USER 执行 `db/migrations/20260827__sys_user_avatar_url.sql` |
-
----
-
-## 7. 阿里云 OSS 配置（图片资源存储）
-
-> 图片资源（演出海报、营销图、用户头像）统一存储。生产用阿里云 OSS：**后端代理上传**（AccessKey 只存在后端）。
-> OSS 为**可选依赖**：未启用时若 `LocalStorage:Enabled=true`（本地磁盘存储，Development 默认开启，多实例共享挂载卷即互通），上传落本地磁盘并经静态托管 `/files` 读回；`Oss:Enabled=false` 且 `LocalStorage:Enabled=false` 时上传接口返回 `503 FILE_STORAGE_NOT_CONFIGURED`，不影响其他功能。
-
-### 7.1 资源准备（一次性，阿里云控制台）
-
-| 项 | 建议 | 说明 |
-|----|------|------|
-| Bucket | `showtime-assets` | 全局唯一；**读写权限 = 公共读**（Public Read），否则公开 URL 匿名访问 403 |
-| Region / Endpoint | `cn-hangzhou` | Endpoint 必须与 Bucket 同 Region：`https://oss-cn-hangzhou.aliyuncs.com` |
-| RAM 子账号 | 最小权限 | 仅 `oss:PutObject` / `oss:DeleteObject`，Resource 限定 `acs:oss:*:*:showtime-assets/showtime/*` |
-| 生命周期（可选） | 1 天 | 前缀 `showtime/tmp/` 自动清理，兜底异常残留 |
-
-### 7.2 后端配置
-
-配置节 `Oss`（模板见 `backend/appsettings.example.json`），**AccessKey 不入库不入 git**：
-
-| 配置项 | 必填 | 说明 |
-|--------|------|------|
-| `Oss:Enabled` | 否 | kill-switch，默认 true；本地无 OSS 时置 false（`appsettings.Development.json` 默认已为 false） |
-| `Oss:Endpoint` | 启用时必填 | 如 `https://oss-cn-hangzhou.aliyuncs.com`，与 Bucket 同 Region |
-| `Oss:Bucket` | 启用时必填 | 如 `showtime-assets`（全局唯一） |
-| `Oss:BaseUrl` | 启用时必填 | Bucket 外网访问域名，如 `https://showtime-assets.oss-cn-hangzhou.aliyuncs.com` |
-| `Oss:MaxFileSizeBytes` | 否 | 单文件大小上限，默认 5242880（5MB） |
-| `Oss:AllowedExtensions` | 否 | 扩展名白名单，默认 jpg/jpeg/png/webp/gif |
-
-本地开发（user-secrets，生产请勿使用）：
-
-```bash
-cd backend
-dotnet user-secrets set "Oss:AccessKeyId" "<ram-access-key-id>"
-dotnet user-secrets set "Oss:AccessKeySecret" "<ram-access-key-secret>"
-```
-
-生产环境（systemd `EnvironmentFile` / K8s Secret，与 `ConnectionStrings__Oracle` 同理）：
-
-```ini
-Oss__Endpoint=https://oss-cn-hangzhou.aliyuncs.com
-Oss__Bucket=showtime-assets
-Oss__BaseUrl=https://showtime-assets.oss-cn-hangzhou.aliyuncs.com
-Oss__AccessKeyId=<ram-access-key-id>
-Oss__AccessKeySecret=<ram-access-key-secret>
-Oss__Enabled=true
-```
-
-> 启用后启动即校验 Endpoint/Bucket/BaseUrl/AccessKey 非空，缺失时启动报错（fail-fast）。
-
-### 7.3 上传接口与对象键
-
-- `POST /api/files/upload`（multipart，需认证）：字段 `file`（必填）、`folder`（可选，白名单 `show`/`marketing`/`avatar`/`tmp`，默认 `tmp`）、`contentType`（可选）。
-- 成功响应 `{ "success": true, "data": { "url", "objectKey" } }`，业务表直接存 `url`。
-- 对象键：`showtime/{folder}/{yyyy}/{MM}/{guid}.{ext}`，GUID 服务端生成防猜测；公开 URL = `BaseUrl + "/" + objectKey`。
-- 校验：大小 ≤ `MaxFileSizeBytes`（超限 413 `FILE_TOO_LARGE`）、扩展名白名单 + Content-Type `image/*` 二次校验（`400 UNSUPPORTED_FILE_TYPE`）、`RequestSizeLimit` 兜底。
-- 前端：`FileUploader` 组件（`frontend/src/components/FileUploader`）封装上传与回显；头像上传后经 `PUT /api/users/me/avatar` 持久化到 `SYS_USER.AVATAR_URL`（迁移脚本 `db/migrations/20260827__sys_user_avatar_url.sql`，由 DEPLOY_USER 执行）。
-
-### 7.4 联调验证
-
-管理端登录拿到 token 后上传一张小图：
-
-```bash
-TOKEN=$(curl -s -X POST http://localhost:5146/api/auth/login -H "Content-Type: application/json" \
-  -d '{"account":"<账号>","password":"<密码>"}' | jq -r '.data.accessToken')
-curl -s -X POST http://localhost:5146/api/files/upload \
-  -H "Authorization: Bearer $TOKEN" -F "file=@poster.png" -F "folder=show"
-```
-
-期望：`success=true`，`data.url` 可直接在浏览器打开（公开读，无需签名）。
