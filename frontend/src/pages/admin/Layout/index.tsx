@@ -6,6 +6,14 @@ import {
   ShoppingCartOutlined,
   PlusCircleOutlined,
   AppstoreOutlined,
+  DashboardOutlined,
+  NotificationOutlined,
+  RollbackOutlined,
+  SwapOutlined,
+  FileTextOutlined,
+  FileSyncOutlined,
+  ControlOutlined,
+  QrcodeOutlined,
 } from '@ant-design/icons'
 
 const { Sider, Content } = Layout
@@ -14,8 +22,12 @@ const AdminLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // 侧边栏4个菜单项
   const menuItems = [
+    {
+      key: '/admin/dashboard',
+      icon: <DashboardOutlined />,
+      label: '数据看板',
+    },
     {
       key: '/admin/performance',
       icon: <UnorderedListOutlined />,
@@ -32,6 +44,36 @@ const AdminLayout = () => {
       label: '订单管理',
     },
     {
+      key: '/admin/refund',
+      icon: <RollbackOutlined />,
+      label: '退票审核',
+    },
+    {
+      key: '/admin/exchange',
+      icon: <SwapOutlined />,
+      label: '改签审核',
+    },
+    {
+      key: '/admin/refund-policy',
+      icon: <FileTextOutlined />,
+      label: '退票策略',
+    },
+    {
+      key: '/admin/exchange-policy',
+      icon: <FileSyncOutlined />,
+      label: '改签策略',
+    },
+    {
+      key: '/admin/seat-rule',
+      icon: <ControlOutlined />,
+      label: '座位规则',
+    },
+    {
+      key: '/admin/redeem',
+      icon: <QrcodeOutlined />,
+      label: '电子票核销',
+    },
+    {
       key: '/admin/publish',
       icon: <PlusCircleOutlined />,
       label: '演出发布',
@@ -41,10 +83,15 @@ const AdminLayout = () => {
       icon: <AppstoreOutlined />,
       label: '座位图管理',
     },
+    {
+      key: '/admin/marketing',
+      icon: <NotificationOutlined />,
+      label: '营销配置',
+    },
   ]
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', minWidth: 1280 }}>
       {/* 左侧深色侧边栏 */}
       <Sider width={200} theme="dark">
         <div style={{

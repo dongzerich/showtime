@@ -84,6 +84,8 @@ const PerformanceDetail = () => {
             <img
               src={show.posterUrl || 'https://picsum.photos/seed/fallback/300/400'}
               alt={show.showName}
+              loading="lazy"
+              decoding="async"
               className="detail-poster"
             />
           </div>
