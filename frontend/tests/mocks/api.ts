@@ -319,12 +319,20 @@ export async function mockApi(page: Page): Promise<void> {
     }
 
     // ---------- 演出 / 场次 ----------
+    if (method === 'GET' && path === 'categories') {
+      return fulfill(200, ok([
+        { categoryId: 1, categoryName: '演唱会', parentId: null, sortOrder: 1 },
+        { categoryId: 2, categoryName: '话剧', parentId: null, sortOrder: 2 },
+      ]));
+    }
+
     if (method === 'GET' && path === 'client/shows') {
       const url = new URL(request.url());
       const keyword = (url.searchParams.get('Keyword') ?? '').trim();
+      const categoryId = Number(url.searchParams.get('CategoryId') ?? 0);
       const items = keyword
         ? MOCK_SHOWS.filter((s) => s.showName.includes(keyword))
-        : MOCK_SHOWS;
+        : MOCK_SHOWS.filter((s) => !categoryId || s.categoryId === categoryId);
       return fulfill(200, ok({
         items,
         page: 1,
@@ -457,8 +465,11 @@ export async function mockApi(page: Page): Promise<void> {
     }
 
     if (method === 'GET' && path === 'orders') {
+      const url = new URL(request.url());
+      const status = url.searchParams.get('Status');
+      const filteredOrders = db.orders.filter((order) => !status || order.orderStatus === status);
       return fulfill(200, ok({
-        items: db.orders
+        items: filteredOrders
           .slice()
           .sort((a, b) => b.orderId - a.orderId)
           .map((o) => ({
@@ -474,7 +485,7 @@ export async function mockApi(page: Page): Promise<void> {
           })),
         page: 1,
         pageSize: 10,
-        totalCount: db.orders.length,
+        totalCount: filteredOrders.length,
       }));
     }
 

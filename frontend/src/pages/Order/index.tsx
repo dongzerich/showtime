@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tag, Typography, Empty, Modal, Button, message, Spin, Divider, notification, Tabs, Card } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { List as VirtualList } from 'react-window';
@@ -102,13 +102,30 @@ const Order = () => {
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [paying, setPaying] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const statusFilterRef = useRef(statusFilter);
+  const pageRef = useRef(page);
+  const pageSizeRef = useRef(pageSize);
+  const [rowHeight, setRowHeight] = useState(92);
+
+  useEffect(() => {
+    statusFilterRef.current = statusFilter;
+    pageRef.current = page;
+    pageSizeRef.current = pageSize;
+  }, [statusFilter, page, pageSize]);
+
+  useEffect(() => {
+    const updateRowHeight = () => setRowHeight(window.innerWidth <= 768 ? 116 : 92);
+    updateRowHeight();
+    window.addEventListener('resize', updateRowHeight);
+    return () => window.removeEventListener('resize', updateRowHeight);
+  }, []);
 
   // ========== 获取订单列表 ==========
   const fetchOrders = async (currentPage: number = page, currentPageSize: number = pageSize) => {
     setLoading(true);
     try {
       const { data, error } = await orderAPI.getOrders({
-        Status: statusFilter === 'ALL' ? undefined : statusFilter as any,
+        Status: statusFilterRef.current === 'ALL' ? undefined : statusFilterRef.current as any,
         Page: currentPage,
         PageSize: currentPageSize,
       });
@@ -155,14 +172,14 @@ const Order = () => {
         message: '新订单创建成功',
         description: `订单号 ${event.orderNo}，共 ${event.ticketCount} 张票`,
       });
-      fetchOrders();
+      fetchOrders(pageRef.current, pageSizeRef.current);
     });
     const unsubscribeRefund = subscribeRefundStatusChanged((event) => {
       notification.info({
         message: `退款单 ${event.refundNo} 状态更新`,
         description: refundStatusText(event),
       });
-      fetchOrders();
+      fetchOrders(pageRef.current, pageSizeRef.current);
     });
     return () => {
       unsubscribeCreated();
@@ -290,8 +307,9 @@ const Order = () => {
           <Spin spinning={loading}>
             {orders.length > 0 ? (
               <VirtualList<OrderRowData>
+                key={`${statusFilter}-${page}-${pageSize}`}
                 rowCount={orders.length}
-                rowHeight={92}
+                rowHeight={rowHeight}
                 overscanCount={5}
                 rowComponent={OrderRow}
                 rowProps={{
@@ -300,7 +318,7 @@ const Order = () => {
                   onCancel: handleCancelOrder,
                   onOpenDetail: (orderId) => navigate(`/order/${orderId}`),
                 }}
-                style={{ height: Math.min(600, orders.length * 92), width: '100%' }}
+                style={{ height: Math.min(600, orders.length * rowHeight), width: '100%' }}
               />
             ) : (
               <Empty description="当前状态暂无订单" />

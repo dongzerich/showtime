@@ -108,6 +108,15 @@ const UserCenter = () => {
   };
 
   const deleteRealName = async (realNameId: number) => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: '确认删除实名认证？',
+        content: '删除后如需使用实名购票，需要重新添加实名信息。',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+    if (!confirmed) return;
     const { data, error } = await userAPI.deleteRealName(realNameId);
     if (error || !data?.success) {
       message.error(data?.message || '删除实名认证失败');
@@ -211,7 +220,7 @@ const UserCenter = () => {
               <span className="label">{item.realName}{item.isDefault ? '（默认）' : ''}</span>
               <span className="value">{item.maskedIdCardNo}</span>
               <Button type="link" size="small" onClick={() => void setDefaultRealName(Number(item.realNameId))} disabled={item.isDefault}>设为默认</Button>
-              <Button type="link" size="small" onClick={() => openRealNameModal(item)}>编辑</Button>
+              {!item.isVerified && <Button type="link" size="small" onClick={() => openRealNameModal(item)}>编辑</Button>}
               <Button type="link" size="small" danger onClick={() => void deleteRealName(Number(item.realNameId))}>删除</Button>
             </div>
           ))}
@@ -316,7 +325,7 @@ const UserCenter = () => {
           <Form.Item label="真实姓名" name="realName" rules={[{ required: true, message: '请输入真实姓名' }]}>
             <Input />
           </Form.Item>
-          <Form.Item label="身份证号" name="idCardNo" rules={[{ required: !editingRealName, message: '请输入身份证号' }]}>
+          <Form.Item label="身份证号" name="idCardNo" rules={[{ required: true, message: '请输入身份证号' }]}>
             <Input />
           </Form.Item>
           <Form.Item>

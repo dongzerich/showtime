@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Layout, Button, Input, InputNumber, Card, Typography, Divider, Spin, Empty, message, Tag, Select } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Grid } from 'react-window';
@@ -39,7 +39,7 @@ const ShowGridCell = ({
       <Card
         hoverable
         onClick={() => navigate(`/performance/${show.showId}`)}
-        cover={<picture><source srcSet={getPoster(show).replace(/\.(jpe?g|png)$/i, '.webp')} type="image/webp" /><img className="show-poster" loading="lazy" decoding="async" alt={show.showName} src={getPoster(show)} /></picture>}
+        cover={<img className="show-poster" loading="lazy" decoding="async" alt={show.showName} src={getPoster(show)} />}
       >
         <Card.Meta
           title={show.showName}
@@ -57,6 +57,7 @@ const Search = () => {
 
   // 状态
   const [searchText, setSearchText] = useState(initialQuery);
+  const [appliedKeyword, setAppliedKeyword] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([{ id: 0, name: '全部' }]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
@@ -66,6 +67,7 @@ const Search = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [columnCount, setColumnCount] = useState(4);
+  const requestVersion = useRef(0);
   const pageSize = 100;
   const gridRowHeight = columnCount === 4 ? 316 : 376;
 
@@ -86,6 +88,7 @@ const Search = () => {
 
   // ========== 搜索演出 ==========
   const fetchShows = async (keyword?: string) => {
+    const currentRequest = ++requestVersion.current;
     setLoading(true);
     try {
       const params: any = {
@@ -126,8 +129,9 @@ const Search = () => {
           return { ...item, minPrice: Number.isFinite(minPrice) ? minPrice : null };
         }));
         const filtered = items.filter((item: any) => item.minPrice !== null && item.minPrice >= appliedPriceRange[0] && item.minPrice <= appliedPriceRange[1]);
-        setShows(filtered);
-        setTotal(filtered.length);
+        if (currentRequest !== requestVersion.current) return;
+        setShows((current) => page > 1 ? [...current, ...filtered] : filtered);
+        setTotal(Number(data.data.totalCount || 0));
         if (items.length > 0) {
           const maxPrice = Math.max(2000, ...items.map((item: any) => Number(item.minPrice || 0)));
           setPriceRange((current) => {
@@ -149,8 +153,8 @@ const Search = () => {
 
   // ========== 初始加载 ==========
   useEffect(() => {
-    fetchShows(searchText);
-  }, [page, selectedCategory, searchText, appliedPriceRange]);
+    fetchShows(appliedKeyword);
+  }, [page, selectedCategory, appliedKeyword, appliedPriceRange]);
 
   // ========== 搜索按钮 ==========
   const handleSearch = () => {
@@ -159,6 +163,7 @@ const Search = () => {
       return;
     }
     setPage(1);
+    setAppliedKeyword(searchText.trim());
     setAppliedPriceRange(priceRange);
   };
 
@@ -175,6 +180,7 @@ const Search = () => {
     setPriceRange([0, 2000]);
     setAppliedPriceRange([0, 2000]);
     setSearchText('');
+    setAppliedKeyword('');
     setPage(1);
   };
 
