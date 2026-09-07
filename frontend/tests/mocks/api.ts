@@ -806,6 +806,14 @@ export async function mockApi(page: Page, seed?: (db: MockDb) => void): Promise<
 
     const dynamicPricing = path.match(/^admin\/sessions\/(\d+)\/dynamic-pricing-rules$/);
     if (method === 'POST' && dynamicPricing) {
+      const rules = (Array.isArray(rawBody) ? rawBody : []) as Array<Record<string, unknown>>;
+      // 对齐后端 ShowSessionImplement 校验：时间窗口为开演前分钟数，起始必须 >= 结束
+      const invalid = rules.find((r) =>
+        r.startOffsetMinutes != null && r.endOffsetMinutes != null && Number(r.startOffsetMinutes) < Number(r.endOffsetMinutes),
+      );
+      if (invalid) {
+        return fulfill(400, fail(`调价时间窗口配置无效：StartOffsetMinutes (${invalid.startOffsetMinutes}) 必须大于等于 EndOffsetMinutes (${invalid.endOffsetMinutes})`));
+      }
       return fulfill(200, ok(null));
     }
 

@@ -302,8 +302,8 @@ test.describe.serial('管理端 E2E：缺口补全功能', () => {
     await modal.locator('input[placeholder="规则名"]').fill('开演前2小时折扣');
     await modal.locator('.ant-select', { hasText: '触发类型' }).click();
     await page.locator('.ant-select-item-option', { hasText: '时间窗口' }).click();
-    await modal.locator('input[placeholder="起始偏移(分)"]').fill('-120');
-    await modal.locator('input[placeholder="结束偏移(分)"]').fill('0');
+    await modal.locator('input[placeholder="起始偏移(分)"]').fill('120');
+    await modal.locator('input[placeholder="结束偏移(分)"]').fill('30');
     await modal.locator('.ant-select', { hasText: '调整方式' }).click();
     await page.locator('.ant-select-item-option', { hasText: '折扣率' }).click();
     await modal.locator('input[placeholder="调整值"]').fill('0.9');
