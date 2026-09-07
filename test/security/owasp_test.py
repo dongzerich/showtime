@@ -1,132 +1,128 @@
-
-
-## 文件6：`test/security/owasp_test.py`
-
-```python
 #!/usr/bin/env python3
-import requests
-import json
-import time
+"""OWASP Top 10 安全冒烟测试（Showtime 后端）。
+
+前置条件：
+- 后端已在 BASE_URL（默认 http://localhost:5146）运行；
+- 已用 test/jmeter/seed_users.py 创建测试账号，或通过环境变量
+  TEST_ACCOUNT / TEST_PASSWORD 指定一个真实可登录账号。
+
+覆盖项与不适用说明：
+- A01 失效访问控制：匿名访问受保护接口应 401；普通用户访问 /api/admin/** 应 403（垂直越权）；
+- A03 SQL 注入 / XSS：通过 /api/client/shows?keyword= 做反射冒烟（后端为参数化查询，
+  黑盒仅能做冒烟，不能证明绝对安全）；
+- A05 敏感信息泄露：错误响应不应携带堆栈/内部异常信息；
+- A07 爆破与限流：login 限流 5 次/分钟/IP，连续错误密码必须触发 429；
+- CSRF：本项目为纯 Bearer JWT、无 Cookie 会话，CSRF 攻击面不适用，故不执行
+  （若未来引入 Cookie 会话需补测）。
+"""
+import os
+import sys
 from urllib.parse import quote
 
-BASE_URL = "http://localhost:5146"
-TEST_USER = {"account": "e2e_test_001", "password": "Test123456"}
+import requests
 
-print("=" * 60)
-print("OWASP Top 10 安全测试 - Showtime")
-print("=" * 60)
+BASE_URL = os.environ.get("SHOWTIME_BASE_URL", "http://localhost:5146")
+TEST_ACCOUNT = os.environ.get("TEST_ACCOUNT", "e2e_test_001")
+TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "Test123456")
+LEAK_MARKERS = ("stacktrace", "inner exception", "at showtimebackend.", "at system.")
 
-# ============================================================
-# 1. A01: 失效的访问控制
-# ============================================================
-print("\n[1] A01: 失效的访问控制")
+FAILED: list[str] = []
 
-# 无 token 访问订单列表
-resp = requests.get(f"{BASE_URL}/api/orders")
-print(f"  无 token 访问 /api/orders: {resp.status_code} (预期 401)")
-assert resp.status_code == 401, "❌ 应返回 401"
 
-# 无 token 访问用户中心
-resp = requests.get(f"{BASE_URL}/api/users/me")
-print(f"  无 token 访问 /api/users/me: {resp.status_code} (预期 401)")
-assert resp.status_code == 401, "❌ 应返回 401"
+def check(name: str, condition: bool, detail: str = "") -> None:
+    status = "✅" if condition else "❌"
+    print(f"  {status} {name}" + (f" ({detail})" if detail else ""))
+    if not condition:
+        FAILED.append(name)
 
-print("  ✅ 访问控制测试通过")
 
-# ============================================================
-# 2. A03: SQL 注入
-# ============================================================
-print("\n[2] A03: SQL 注入")
+def main() -> None:
+    print("=" * 60)
+    print("OWASP Top 10 安全冒烟测试 - Showtime")
+    print(f"目标: {BASE_URL}")
+    print("=" * 60)
 
-payloads = ["' OR '1'='1", "admin'--", "'; DROP TABLE sys_user; --"]
-for payload in payloads:
-    resp = requests.get(f"{BASE_URL}/api/client/shows?keyword={quote(payload)}")
-    if "ORA-" in resp.text or "SQL" in resp.text.upper():
-        print(f"  ⚠️ 可能存在 SQL 注入: {payload[:20]}")
-    else:
-        print(f"  ✅ 安全: {payload[:20]}")
+    # ---- 1. A01: 匿名访问受保护接口 ----
+    print("\n[1] A01: 失效的访问控制（匿名访问）")
+    resp = requests.get(f"{BASE_URL}/api/orders", timeout=10)
+    check("无 token 访问 /api/orders -> 401", resp.status_code == 401, f"HTTP {resp.status_code}")
+    resp = requests.get(f"{BASE_URL}/api/auth/sessions", timeout=10)
+    check("无 token 访问 /api/auth/sessions -> 401", resp.status_code == 401, f"HTTP {resp.status_code}")
 
-# ============================================================
-# 3. A07: 识别与认证失败 - 暴力破解 + 429限流
-# ============================================================
-print("\n[3] A07: 暴力破解防护")
-
-success_count = 0
-rate_limit_triggered = False
-
-for i in range(15):
-    resp = requests.post(
+    # ---- 前置: 登录（login 限流 5 次/分钟/IP，本脚本全程只登录 1 次 + 末段爆破用例）----
+    print("\n[前置] 登录测试账号")
+    login_resp = requests.post(
         f"{BASE_URL}/api/auth/login",
-        json={"account": TEST_USER["account"], "password": f"wrong_{i}"}
+        json={"account": TEST_ACCOUNT, "password": TEST_PASSWORD},
+        timeout=10,
     )
-    if resp.status_code == 200:
-        success_count += 1
-    elif resp.status_code == 429:
-        rate_limit_triggered = True
-        print(f"  尝试 {i+1}: {resp.status_code} (速率限制触发 ✅)")
+    if login_resp.status_code != 200:
+        print(f"  ❌ 登录失败: HTTP {login_resp.status_code} {login_resp.text[:200]}")
+        print("  请先运行 test/jmeter/seed_users.py 建号，或用 TEST_ACCOUNT/TEST_PASSWORD 指定账号。")
+        sys.exit(2)
+    token = login_resp.json()["data"]["accessToken"]
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    print("  ✅ 登录成功")
 
-if success_count == 0:
-    print("  ✅ 暴力破解防护有效")
-else:
-    print(f"  ⚠️ 有 {success_count} 次成功登录")
+    # ---- 2. A01: 垂直越权（普通用户访问管理端）----
+    print("\n[2] A01: 垂直越权（普通用户访问 /api/admin/orders）")
+    resp = requests.get(f"{BASE_URL}/api/admin/orders", headers=auth_headers, timeout=10)
+    check("普通用户 -> 403", resp.status_code == 403, f"HTTP {resp.status_code}")
+    print("  说明: 订单/锁座/实名等资源均由 JWT sub 归属、按当前用户过滤，接口不接收跨用户 ID，"
+          "黑盒无法构造水平越权；若新增可指定归属者的接口需补测。")
 
-if rate_limit_triggered:
-    print("  ✅ 速率限制生效 (429)")
-else:
-    print("  ⚠️ 速率限制未触发，建议检查限流配置")
+    # ---- 3. A03: SQL 注入反射冒烟 ----
+    print("\n[3] A03: SQL 注入（keyword 反射冒烟）")
+    for payload in ["' OR '1'='1", "admin'--", "'; DROP TABLE sys_user; --"]:
+        resp = requests.get(f"{BASE_URL}/api/client/shows?keyword={quote(payload)}", timeout=10)
+        leaked = resp.status_code >= 500 or "ORA-" in resp.text or "SQL" in resp.text.upper()
+        check(f"payload 未导致错误/回显: {payload[:18]}", not leaked, f"HTTP {resp.status_code}")
 
-# ============================================================
-# 4. A03: CSRF 测试
-# ============================================================
-print("\n[4] CSRF 测试 (无 CSRF Token)")
+    # ---- 4. XSS 反射冒烟 ----
+    print("\n[4] XSS（keyword 反射冒烟）")
+    for payload in ["<script>alert('XSS')</script>", "<img src=x onerror=alert('XSS')>"]:
+        resp = requests.get(f"{BASE_URL}/api/client/shows?keyword={quote(payload)}", timeout=10)
+        reflected = resp.status_code == 200 and payload in resp.text
+        check(f"payload 未反射: {payload[:24]}", not reflected, f"HTTP {resp.status_code}")
 
-# 先登录获取 token
-login_resp = requests.post(
-    f"{BASE_URL}/api/auth/login",
-    json=TEST_USER
-)
-token = login_resp.json().get("data", {}).get("accessToken")
+    # ---- 5. A05: 敏感信息泄露 ----
+    print("\n[5] A05: 敏感信息泄露")
+    resp = requests.post(f"{BASE_URL}/api/auth/login", json={"account": "", "password": ""}, timeout=10)
+    leaked = any(marker in resp.text.lower() for marker in LEAK_MARKERS)
+    check("空凭据错误响应无堆栈泄露", not leaked, f"HTTP {resp.status_code}")
+    resp = requests.get(f"{BASE_URL}/api/definitely-not-exist", timeout=10)
+    leaked = any(marker in resp.text.lower() for marker in LEAK_MARKERS)
+    check("404 响应无堆栈泄露", not leaked, f"HTTP {resp.status_code}")
 
-if token:
-    # 不带 CSRF Token 的请求
-    resp = requests.post(
-        f"{BASE_URL}/api/orders",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"sessionId": 1, "items": []}
-    )
-    print(f"  无 CSRF Token 请求: {resp.status_code}")
-    # CSRF 保护通常返回 403
-    if resp.status_code == 403:
-        print("  ✅ CSRF 保护有效")
-    else:
-        print("  ⚠️ 建议检查 CSRF 防护配置")
+    # ---- 6. A07: 爆破防护与限流（放最后: 触发 429 后不再登录）----
+    print("\n[6] A07: 爆破防护与限流")
+    success_count = 0
+    rate_limited = False
+    for i in range(10):
+        resp = requests.post(
+            f"{BASE_URL}/api/auth/login",
+            json={"account": TEST_ACCOUNT, "password": f"wrong_{i}"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            success_count += 1
+        elif resp.status_code == 429:
+            rate_limited = True
+    check("错误密码无成功登录", success_count == 0, f"成功 {success_count} 次")
+    check("连续错误密码触发 429 限流", rate_limited, "未触发 429")
 
-# ============================================================
-# 5. XSS - 跨站脚本
-# ============================================================
-print("\n[5] XSS")
+    print("\n" + "=" * 60)
+    if FAILED:
+        print(f"❌ 失败 {len(FAILED)} 项: {', '.join(FAILED)}")
+        sys.exit(1)
+    print("✅ 安全冒烟测试全部通过")
+    print("=" * 60)
 
-xss_payloads = ["<script>alert('XSS')</script>", "<img src=x onerror=alert('XSS')>"]
-for payload in xss_payloads:
-    resp = requests.get(f"{BASE_URL}/api/client/shows?keyword={quote(payload)}")
-    if payload in resp.text:
-        print(f"  ⚠️ 可能存在 XSS: {payload[:20]}")
-    else:
-        print(f"  ✅ 安全: {payload[:20]}")
 
-# ============================================================
-# 6. 敏感信息泄露
-# ============================================================
-print("\n[6] 敏感信息泄露")
-
-resp = requests.post(
-    f"{BASE_URL}/api/auth/login",
-    json={"account": "", "password": ""}
-)
-if "stacktrace" in resp.text.lower() or "inner exception" in resp.text.lower():
-    print("  ⚠️ 错误响应泄露堆栈信息")
-else:
-    print("  ✅ 错误响应安全")
-
-print("\n" + "=" * 60)
-print("安全测试完成")
+if __name__ == "__main__":
+    try:
+        main()
+    except requests.RequestException as exc:
+        print(f"❌ 无法连接后端 {BASE_URL}: {exc}")
+        print("请确认后端已启动，或通过 SHOWTIME_BASE_URL 指定正确地址。")
+        sys.exit(2)
