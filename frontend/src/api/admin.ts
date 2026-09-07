@@ -239,3 +239,24 @@ export const updateMarketingContent = (contentId: number, data: UpdateMarketingC
     body: data,
   });
 };
+
+// 获取营销内容列表（管理端）
+export const getMarketingContentList = (params?: {
+  ShowId?: number;
+  ContentType?: MarketingContentType;
+  Status?: MarketingContentStatus;
+  Keyword?: string;
+  PageIndex?: number;
+  PageSize?: number;
+}) => {
+  return client.GET('/api/admin/marketing-contents', {
+    params: { query: params },
+  });
+};
+
+// 删除营销内容
+export const deleteMarketingContent = (contentId: number) => {
+  return client.DELETE('/api/admin/marketing-contents/{contentId}', {
+    params: { path: { contentId } },
+  });
+};
