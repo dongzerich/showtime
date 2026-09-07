@@ -7,15 +7,22 @@ import {
   Tag,
   Modal,
   Descriptions,
+  Form,
+  Input,
+  InputNumber,
   message,
+  Popconfirm,
 } from 'antd'
 import {
   getShowList,
   getShowSessions,
   updateSessionStatus,
+  getSeatSections,
+  configureDynamicPricingRules,
   type ShowDto,
   type ShowSessionDto,
   type SessionStatus,
+  type CreateDynamicPricingRuleRequest,
 } from '../../../api/admin'
 
 const sessionStatusMap: Record<SessionStatus, { text: string; color: string }> = {
@@ -33,6 +40,11 @@ const Session = () => {
   const [loading, setLoading] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
   const [currentSession, setCurrentSession] = useState<ShowSessionDto | null>(null)
+  // 动态定价配置
+  const [pricingVisible, setPricingVisible] = useState(false)
+  const [pricingSections, setPricingSections] = useState<{ seatSectionId: number | string; sectionName: string }[]>([])
+  const [pricingSaving, setPricingSaving] = useState(false)
+  const [pricingForm] = Form.useForm()
 
   // 加载演出列表
   useEffect(() => {
@@ -88,6 +100,73 @@ const Session = () => {
   const handleViewDetail = (session: ShowSessionDto) => {
     setCurrentSession(session)
     setDetailVisible(true)
+  }
+
+  const openPricing = async (session: ShowSessionDto) => {
+    setCurrentSession(session)
+    pricingForm.resetFields()
+    setPricingVisible(true)
+    setPricingSections([])
+    try {
+      const res = await getSeatSections(Number(session.seatMapId), { PageSize: 100 })
+      if (res.data?.data) {
+        setPricingSections(
+          (res.data.data.items || []).map(s => ({
+            seatSectionId: s.seatSectionId,
+            sectionName: s.sectionName || `票区#${s.seatSectionId}`,
+          })),
+        )
+      }
+    } catch {
+      message.error('加载票区失败')
+    }
+  }
+
+  const handleSavePricing = async () => {
+    if (!currentSession) return
+    try {
+      const values = await pricingForm.validateFields()
+      const rules: CreateDynamicPricingRuleRequest[] = (values.rules || []).map((r: Record<string, unknown>) => ({
+        ruleName: String(r.ruleName).trim(),
+        triggerType: String(r.triggerType),
+        startOffsetMinutes: r.startOffsetMinutes == null || r.startOffsetMinutes === '' ? null : Number(r.startOffsetMinutes),
+        endOffsetMinutes: r.endOffsetMinutes == null || r.endOffsetMinutes === '' ? null : Number(r.endOffsetMinutes),
+        adjustmentType: String(r.adjustmentType),
+        adjustmentValue: Number(r.adjustmentValue),
+        priority: Number(r.priority ?? 0),
+        seatSectionId: r.seatSectionId == null ? null : Number(r.seatSectionId),
+      }))
+      setPricingSaving(true)
+      const res = await configureDynamicPricingRules(Number(currentSession.sessionId), rules)
+      if (res.error) {
+        message.error('保存失败')
+        return
+      }
+      message.success('动态定价规则已保存（整批覆盖）')
+      setPricingVisible(false)
+    } catch {
+      // 表单校验失败或保存异常，均由 antd / 中间件提示
+    } finally {
+      setPricingSaving(false)
+    }
+  }
+
+  const handleClearPricing = async () => {
+    if (!currentSession) return
+    setPricingSaving(true)
+    try {
+      const res = await configureDynamicPricingRules(Number(currentSession.sessionId), [])
+      if (res.error) {
+        message.error('清空失败')
+        return
+      }
+      message.success('已清空该场次动态定价规则')
+      setPricingVisible(false)
+    } catch {
+      message.error('清空失败')
+    } finally {
+      setPricingSaving(false)
+    }
   }
 
   const columns = [
@@ -149,6 +228,9 @@ const Session = () => {
         <Space>
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
             详情
+          </Button>
+          <Button type="link" size="small" onClick={() => openPricing(record)}>
+            动态定价
           </Button>
           {(record.sessionStatus === 'UPCOMING' || record.sessionStatus === 'PRESALE') && (
             <Button
@@ -240,6 +322,95 @@ const Session = () => {
             </Descriptions.Item>
           </Descriptions>
         )}
+      </Modal>
+
+      <Modal
+        title="动态定价规则"
+        open={pricingVisible}
+        onCancel={() => setPricingVisible(false)}
+        width={880}
+        footer={
+          <Space>
+            <Popconfirm
+              title="确定清空该场次的全部动态定价规则吗？"
+              onConfirm={handleClearPricing}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button danger loading={pricingSaving}>
+                清空全部规则
+              </Button>
+            </Popconfirm>
+            <Button onClick={() => setPricingVisible(false)}>取消</Button>
+            <Button type="primary" loading={pricingSaving} onClick={handleSavePricing}>
+              保存（整批覆盖）
+            </Button>
+          </Space>
+        }
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Tag color="gold">提示</Tag> 本接口为整批覆盖：保存时将替换该场次全部动态定价规则（传空数组即清空）。请先填写需要保留的全部规则。
+          <br />
+          <Tag color="warning">INVENTORY_RATE</Tag> 触发类型当前版本评估恒为 false，建议使用 <Tag color="processing">TIME_WINDOW</Tag>。
+        </div>
+        <Form form={pricingForm}>
+          <Form.List name="rules">
+            {(fields, { add, remove }) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {fields.map(field => (
+                  <div
+                    key={field.key}
+                    style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap', border: '1px solid #f0f0f0', padding: 8, borderRadius: 4 }}
+                  >
+                    <Form.Item name={[field.name, 'ruleName']} rules={[{ required: true, message: '规则名必填' }]} style={{ marginBottom: 0, width: 140 }}>
+                      <Input placeholder="规则名" />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'triggerType']} rules={[{ required: true, message: '必选' }]} style={{ marginBottom: 0, width: 120 }}>
+                      <Select
+                        placeholder="触发类型"
+                        options={[
+                          { value: 'TIME_WINDOW', label: '时间窗口' },
+                          { value: 'INVENTORY_RATE', label: '库存比例(未生效)' },
+                        ]}
+                      />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'startOffsetMinutes']} style={{ marginBottom: 0, width: 110 }}>
+                      <InputNumber placeholder="起始偏移(分)" min={-10080} max={10080} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'endOffsetMinutes']} style={{ marginBottom: 0, width: 110 }}>
+                      <InputNumber placeholder="结束偏移(分)" min={-10080} max={10080} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'adjustmentType']} rules={[{ required: true, message: '必选' }]} style={{ marginBottom: 0, width: 120 }}>
+                      <Select
+                        placeholder="调整方式"
+                        options={[
+                          { value: 'DISCOUNT_RATE', label: '折扣率' },
+                          { value: 'AMOUNT_OFF', label: '立减金额' },
+                          { value: 'FIXED_PRICE', label: '固定价' },
+                        ]}
+                      />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'adjustmentValue']} rules={[{ required: true, message: '必填' }]} style={{ marginBottom: 0, width: 100 }}>
+                      <InputNumber placeholder="调整值" style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'priority']} style={{ marginBottom: 0, width: 80 }}>
+                      <InputNumber placeholder="优先级" min={0} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'seatSectionId']} style={{ marginBottom: 0, width: 160 }}>
+                      <Select placeholder="适用票区(全部)" allowClear options={pricingSections.map(s => ({ value: Number(s.seatSectionId), label: s.sectionName }))} />
+                    </Form.Item>
+                    <Button type="text" danger onClick={() => remove(field.name)}>
+                      删除
+                    </Button>
+                  </div>
+                ))}
+                <Button type="dashed" onClick={() => add({})} block>
+                  + 添加规则
+                </Button>
+              </div>
+            )}
+          </Form.List>
+        </Form>
       </Modal>
     </div>
   )
