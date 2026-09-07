@@ -5,18 +5,17 @@
 | 文件 | 说明 |
 |------|------|
 | `showtime_load_test.jmx` | JMeter 主压测脚本 |
-| `test_users.csv` | 测试用户数据（账号/密码） |
+| `test_users.csv` | 测试用户数据 |
+| `seed_users.py` | 批量创建测试账号（Python） |
+| `seed_users.sh` | 批量创建测试账号（Shell） |
 
-## 运行方式
+## 前置条件
+
+### 1. 创建测试账号
 
 ```bash
-# 进入目录
-cd test/jmeter
+# Python 版本
+python3 seed_users.py
 
-# 运行压测（500并发）
-jmeter -n -t showtime_load_test.jmx -l results.jtl -e -o report/
-
-# 不同并发级别
-jmeter -n -t showtime_load_test.jmx -JTHREADS=500 -l results_500.jtl -e -o report_500/
-jmeter -n -t showtime_load_test.jmx -JTHREADS=1000 -l results_1000.jtl -e -o report_1000/
-jmeter -n -t showtime_load_test.jmx -JTHREADS=2000 -l results_2000.jtl -e -o report_2000/
+# 或 Shell 版本（Git Bash / WSL）
+bash seed_users.sh

@@ -8,54 +8,72 @@
       <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="用户定义的变量" enabled="true">
         <collectionProp name="Arguments.arguments">
-          <elementProp name="BASE_URL" elementType="Argument">
-            <stringProp name="Argument.name">BASE_URL</stringProp>
-            <stringProp name="Argument.value">http://localhost:5146</stringProp>
+          <elementProp name="DOMAIN" elementType="Argument">
+            <stringProp name="Argument.name">DOMAIN</stringProp>
+            <stringProp name="Argument.value">localhost</stringProp>
           </elementProp>
-          <elementProp name="THREADS" elementType="Argument">
-            <stringProp name="Argument.name">THREADS</stringProp>
-            <stringProp name="Argument.value">500</stringProp>
+          <elementProp name="PORT" elementType="Argument">
+            <stringProp name="Argument.name">PORT</stringProp>
+            <stringProp name="Argument.value">5146</stringProp>
           </elementProp>
-          <elementProp name="RAMP_UP" elementType="Argument">
-            <stringProp name="Argument.name">RAMP_UP</stringProp>
-            <stringProp name="Argument.value">60</stringProp>
+          <elementProp name="PROTOCOL" elementType="Argument">
+            <stringProp name="Argument.name">PROTOCOL</stringProp>
+            <stringProp name="Argument.value">http</stringProp>
           </elementProp>
         </collectionProp>
       </elementProp>
     </TestPlan>
 
     <hashTree>
-      <!-- 线程组 1: 登录压测 -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="登录压测" enabled="true">
+      <!-- ==================== 线程组: 登录→选座→下单（同一线程组串行执行） ==================== -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="完整业务流程压测" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">100</stringProp>
+          <stringProp name="LoopController.loops">${__P(LOOPS,10)}</stringProp>
         </elementProp>
-        <stringProp name="ThreadGroup.num_threads">${THREADS}</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">${RAMP_UP}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(THREADS,500)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(RAMP_UP,60)}</stringProp>
       </ThreadGroup>
 
       <hashTree>
+        <!-- CSV 数据文件（测试用户） -->
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="测试用户数据" enabled="true">
           <stringProp name="CSVDataSet.encoding">UTF-8</stringProp>
           <stringProp name="CSVDataSet.filename">test_users.csv</stringProp>
           <stringProp name="CSVDataSet.variableNames">account,password</stringProp>
           <boolProp name="CSVDataSet.ignoreFirstLine">true</boolProp>
           <boolProp name="CSVDataSet.recycle">true</boolProp>
+          <boolProp name="CSVDataSet.stopThread">false</boolProp>
+          <stringProp name="CSVDataSet.delimiter">,</stringProp>
         </CSVDataSet>
 
+        <!-- HTTP 请求默认值 -->
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP 请求默认值" enabled="true">
+          <stringProp name="HTTPSampler.domain">${DOMAIN}</stringProp>
+          <stringProp name="HTTPSampler.port">${PORT}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${PROTOCOL}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        </ConfigTestElement>
+
+        <!-- HTTP 头管理器 -->
         <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP 头管理器" enabled="true">
           <collectionProp name="HeaderManager.headers">
             <elementProp name="" elementType="Header">
               <stringProp name="Header.name">Content-Type</stringProp>
               <stringProp name="Header.value">application/json</stringProp>
             </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Accept</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
           </collectionProp>
         </HeaderManager>
 
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="登录请求" enabled="true">
-          <stringProp name="HTTPSampler.domain">${BASE_URL}</stringProp>
+        <!-- 1. 登录请求 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="1. 登录" enabled="true">
           <stringProp name="HTTPSampler.path">/api/auth/login</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -70,62 +88,80 @@
           </elementProp>
         </HTTPSamplerProxy>
 
-        <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="响应断言" enabled="true">
+        <!-- JSON 提取器：提取 token -->
+        <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="提取 Token" enabled="true">
+          <stringProp name="JSONPostProcessor.referenceNames">accessToken</stringProp>
+          <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.accessToken</stringProp>
+          <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+        </JSONPostProcessor>
+
+        <!-- JSON 提取器：提取 userId -->
+        <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="提取 userId" enabled="true">
+          <stringProp name="JSONPostProcessor.referenceNames">userId</stringProp>
+          <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.user.userId</stringProp>
+          <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+        </JSONPostProcessor>
+
+        <!-- 登录响应断言 -->
+        <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="登录响应断言" enabled="true">
           <collectionProp name="Asserion.test_strings">
             <stringProp name="-1349267989">"success":true</stringProp>
           </collectionProp>
           <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          <boolProp name="Assertion.assume_success">false</boolProp>
+          <intProp name="Assertion.ignore_status">0</intProp>
         </ResponseAssertion>
 
-        <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="提取 Token" enabled="true">
-          <stringProp name="JSONPostProcessor.referenceNames">accessToken</stringProp>
-          <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.accessToken</stringProp>
-        </JSONPostProcessor>
-      </hashTree>
-
-      <!-- 线程组 2: 下单压测 -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="下单压测" enabled="true">
-        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
-        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器" enabled="true">
-          <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">100</stringProp>
-        </elementProp>
-        <stringProp name="ThreadGroup.num_threads">${THREADS}</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">${RAMP_UP}</stringProp>
-      </ThreadGroup>
-
-      <hashTree>
-        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP 头管理器" enabled="true">
-          <collectionProp name="HeaderManager.headers">
-            <elementProp name="" elementType="Header">
-              <stringProp name="Header.name">Content-Type</stringProp>
-              <stringProp name="Header.value">application/json</stringProp>
-            </elementProp>
-            <elementProp name="" elementType="Header">
-              <stringProp name="Header.name">Authorization</stringProp>
-              <stringProp name="Header.value">Bearer ${accessToken}</stringProp>
-            </elementProp>
-          </collectionProp>
-        </HeaderManager>
-
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="下单请求" enabled="true">
-          <stringProp name="HTTPSampler.path">/api/orders</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
+        <!-- 2. 选座请求（获取座位列表） -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2. 选座（获取座位）" enabled="true">
+          <stringProp name="HTTPSampler.path">/api/sessions/1/seat-locks</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
             <collectionProp name="Arguments.arguments">
               <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{"sessionId":1,"items":[{"seatId":1,"priceStrategyId":1,"lockToken":"test"}]}</stringProp>
+                <stringProp name="Argument.name">seatId</stringProp>
+                <stringProp name="Argument.value">${__Random(1,100)}</stringProp>
               </elementProp>
             </collectionProp>
           </elementProp>
         </HTTPSamplerProxy>
 
-        <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="响应断言" enabled="true">
+        <!-- 选座响应断言（检查 HTTP 状态码） -->
+        <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="选座响应断言" enabled="true">
           <collectionProp name="Asserion.test_strings">
             <stringProp name="-1349267989">"success":true</stringProp>
           </collectionProp>
+          <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          <boolProp name="Assertion.assume_success">false</boolProp>
+          <intProp name="Assertion.ignore_status">0</intProp>
+        </ResponseAssertion>
+
+        <!-- 3. 下单请求 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="3. 下单" enabled="true">
+          <stringProp name="HTTPSampler.path">/api/orders</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{"sessionId":1,"items":[{"seatId":${__Random(1,100)},"priceStrategyId":1,"lockToken":"test-lock-${__UUID}"}],"remark":"load-test"}</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+
+        <!-- 下单响应断言 -->
+        <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="下单响应断言" enabled="true">
+          <collectionProp name="Asserion.test_strings">
+            <stringProp name="-1349267989">"success":true</stringProp>
+          </collectionProp>
+          <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+          <boolProp name="Assertion.assume_success">false</boolProp>
+          <intProp name="Assertion.ignore_status">0</intProp>
         </ResponseAssertion>
       </hashTree>
     </hashTree>
