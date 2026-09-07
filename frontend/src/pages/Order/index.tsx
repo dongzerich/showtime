@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Table, Tag, Typography, Empty, Modal, Button, message, Spin, Divider, notification } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { useState, useEffect, useRef } from 'react';
+import { Tag, Typography, Empty, Modal, Button, message, Spin, Divider, notification, Tabs, Card } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { List as VirtualList } from 'react-window';
 import { orderAPI, paymentAPI } from '@/api/requests';
 import type { components } from '@/api/types';
 import type { OrderSummaryResponse, PaymentResponse } from '@/types/api';
@@ -43,6 +43,48 @@ const REFUND_STATUS_TEXT: Record<string, string> = {
 const refundStatusText = (event: RefundStatusChangedEvent) =>
   REFUND_STATUS_TEXT[event.refundStatus] || `退款状态：${event.refundStatus}`;
 
+type OrderRowData = {
+  orders: OrderSummaryResponse[];
+  onOpenPayment: (order: OrderSummaryResponse) => void;
+  onCancel: (orderId: number) => void;
+  onOpenDetail: (orderId: number) => void;
+};
+
+const OrderRow = ({ index, style, ariaAttributes, orders, onOpenPayment, onCancel, onOpenDetail }: OrderRowData & {
+  index: number;
+  style: React.CSSProperties;
+  ariaAttributes: React.HTMLAttributes<HTMLDivElement>;
+}) => {
+  const order = orders[index];
+  const status = STATUS_MAP[order.orderStatus] || { color: 'default', text: order.orderStatus };
+
+  return (
+    <div {...ariaAttributes} style={{ ...style, padding: '0 4px 12px' }}>
+      <Card size="small" className="order-row-card">
+        <div className="order-row-main">
+          <div>
+            <div className="order-row-number">{order.orderNo}</div>
+            <Typography.Text type="secondary">
+              {order.ticketCount} 张票 · {new Date(order.createTime).toLocaleString('zh-CN')}
+            </Typography.Text>
+          </div>
+          <div className="order-row-amount">¥{order.totalAmount.toFixed(2)}</div>
+          <Tag color={status.color}>{status.text}</Tag>
+          <div className="order-row-actions">
+            {order.orderStatus === 'PENDING_PAY' && (
+              <>
+                <Button type="primary" size="small" onClick={() => onOpenPayment(order)}>去支付</Button>
+                <Button size="small" danger onClick={() => onCancel(order.orderId)}>取消</Button>
+              </>
+            )}
+            <Button type="link" size="small" onClick={() => onOpenDetail(order.orderId)}>查看详情</Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 const Order = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderSummaryResponse[]>([]);
@@ -50,6 +92,7 @@ const Order = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // 弹窗相关
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,12 +102,30 @@ const Order = () => {
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [paying, setPaying] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const statusFilterRef = useRef(statusFilter);
+  const pageRef = useRef(page);
+  const pageSizeRef = useRef(pageSize);
+  const [rowHeight, setRowHeight] = useState(92);
+
+  useEffect(() => {
+    statusFilterRef.current = statusFilter;
+    pageRef.current = page;
+    pageSizeRef.current = pageSize;
+  }, [statusFilter, page, pageSize]);
+
+  useEffect(() => {
+    const updateRowHeight = () => setRowHeight(window.innerWidth <= 768 ? 116 : 92);
+    updateRowHeight();
+    window.addEventListener('resize', updateRowHeight);
+    return () => window.removeEventListener('resize', updateRowHeight);
+  }, []);
 
   // ========== 获取订单列表 ==========
   const fetchOrders = async (currentPage: number = page, currentPageSize: number = pageSize) => {
     setLoading(true);
     try {
       const { data, error } = await orderAPI.getOrders({
+        Status: statusFilterRef.current === 'ALL' ? undefined : statusFilterRef.current as any,
         Page: currentPage,
         PageSize: currentPageSize,
       });
@@ -99,8 +160,9 @@ const Order = () => {
   };
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    fetchOrders(1, pageSize);
+    setPage(1);
+  }, [statusFilter]);
 
   // ========== 实时通知（下单成功 / 退款状态变化） ==========
   useEffect(() => {
@@ -110,14 +172,14 @@ const Order = () => {
         message: '新订单创建成功',
         description: `订单号 ${event.orderNo}，共 ${event.ticketCount} 张票`,
       });
-      fetchOrders();
+      fetchOrders(pageRef.current, pageSizeRef.current);
     });
     const unsubscribeRefund = subscribeRefundStatusChanged((event) => {
       notification.info({
         message: `退款单 ${event.refundNo} 状态更新`,
         description: refundStatusText(event),
       });
-      fetchOrders();
+      fetchOrders(pageRef.current, pageSizeRef.current);
     });
     return () => {
       unsubscribeCreated();
@@ -131,6 +193,10 @@ const Order = () => {
     setPage(newPage);
     setPageSize(newPageSize);
     fetchOrders(newPage, newPageSize);
+  };
+
+  const handleStatusChange = (key: string) => {
+    setStatusFilter(key);
   };
 
   // ========== 打开支付弹窗 ==========
@@ -195,117 +261,24 @@ const Order = () => {
       onOk: async () => {
         try {
           const { data, error } = await orderAPI.cancelOrder(orderId);
-          if (error) {
-            message.error('取消订单失败');
+          if (error || !data?.success) {
+            message.error(data?.message || '取消订单失败');
             return;
           }
-          if (data?.success) {
-            message.success('订单已取消');
-            fetchOrders();
-          } else {
-            message.error(data?.message || '取消订单失败');
-          }
+          message.success('订单已取消');
+          fetchOrders(page, pageSize);
         } catch (error: any) {
-          console.error('取消订单失败:', error);
           message.error(error.message || '取消订单失败');
         }
       },
     });
   };
 
-  // ========== 关闭弹窗 ==========
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedOrderId(null);
     setPayments([]);
   };
-
-  // ========== 表格列定义 ==========
-  const columns: ColumnsType<OrderSummaryResponse> = [
-    {
-      title: '订单号',
-      dataIndex: 'orderNo',
-      key: 'orderNo',
-      width: 180,
-      render: (text: string) => <span style={{ fontFamily: 'monospace' }}>{text}</span>,
-    },
-    {
-      title: '票数',
-      dataIndex: 'ticketCount',
-      key: 'ticketCount',
-      width: 80,
-      align: 'center',
-    },
-    {
-      title: '金额',
-      dataIndex: 'totalAmount',
-      key: 'totalAmount',
-      width: 120,
-      render: (amount: number) => (
-        <span style={{ color: '#ff4d4f', fontWeight: 600 }}>¥{amount.toFixed(2)}</span>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'orderStatus',
-      key: 'orderStatus',
-      width: 100,
-      render: (status: string) => {
-        const info = STATUS_MAP[status] || { color: 'default', text: status };
-        return <Tag color={info.color}>{info.text}</Tag>;
-      },
-    },
-    {
-      title: '下单时间',
-      dataIndex: 'createTime',
-      key: 'createTime',
-      width: 180,
-      render: (time: string) => new Date(time).toLocaleString('zh-CN'),
-    },
-    {
-      title: '过期时间',
-      dataIndex: 'expireTime',
-      key: 'expireTime',
-      width: 180,
-      render: (time: string) => new Date(time).toLocaleString('zh-CN'),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 200,
-      fixed: 'right',
-      render: (_: any, record: OrderSummaryResponse) => {
-        const status = record.orderStatus;
-
-        if (status === 'PENDING_PAY') {
-          return (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button
-                type="primary"
-                size="small"
-                onClick={() => handleOpenPaymentModal(record.orderId, record.orderNo, record.totalAmount)}
-              >
-                去支付
-              </Button>
-              <Button type="link" size="small" danger onClick={() => handleCancelOrder(record.orderId)}>
-                取消
-              </Button>
-            </div>
-          );
-        }
-
-        if (status === 'PAID' || status === 'ISSUED') {
-          return (
-            <Button type="link" size="small" onClick={() => navigate(`/order/${record.orderId}`)}>
-              查看详情
-            </Button>
-          );
-        }
-
-        return <span style={{ color: '#ccc' }}>--</span>;
-      },
-    },
-  ];
 
   // ========== 待支付统计 ==========
   const pendingOrders = orders.filter((o) => o.orderStatus === 'PENDING_PAY');
@@ -325,26 +298,40 @@ const Order = () => {
             )}
           </Text>
 
+          <Tabs
+            activeKey={statusFilter}
+            onChange={handleStatusChange}
+            items={[{ key: 'ALL', label: '全部' }, ...Object.entries(STATUS_MAP).map(([key, value]) => ({ key, label: value.text }))]}
+          />
+
           <Spin spinning={loading}>
-            <Table<OrderSummaryResponse>
-              dataSource={orders}
-              columns={columns}
-              rowKey="orderId"
-              pagination={{
-                current: page,
-                pageSize: pageSize,
-                total: totalCount,
-                showSizeChanger: true,
-                showTotal: (total) => `共 ${total} 笔订单`,
-                onChange: handlePageChange,
-                onShowSizeChange: handlePageChange,
-              }}
-              bordered
-              style={{ background: '#fff', borderRadius: 12 }}
-              locale={{ emptyText: <Empty description="暂无订单，快去抢票吧！" /> }}
-              scroll={{ x: 900 }}
-            />
+            {orders.length > 0 ? (
+              <VirtualList<OrderRowData>
+                key={`${statusFilter}-${page}-${pageSize}`}
+                rowCount={orders.length}
+                rowHeight={rowHeight}
+                overscanCount={5}
+                rowComponent={OrderRow}
+                rowProps={{
+                  orders,
+                  onOpenPayment: (order) => handleOpenPaymentModal(order.orderId, order.orderNo, order.totalAmount),
+                  onCancel: handleCancelOrder,
+                  onOpenDetail: (orderId) => navigate(`/order/${orderId}`),
+                }}
+                style={{ height: Math.min(600, orders.length * rowHeight), width: '100%' }}
+              />
+            ) : (
+              <Empty description="当前状态暂无订单" />
+            )}
           </Spin>
+
+          {totalCount > 0 && (
+            <div className="order-pagination">
+              <Button disabled={page <= 1} onClick={() => handlePageChange(page - 1, pageSize)}>上一页</Button>
+              <span>第 {page} 页，共 {totalCount} 笔</span>
+              <Button disabled={page * pageSize >= totalCount} onClick={() => handlePageChange(page + 1, pageSize)}>下一页</Button>
+            </div>
+          )}
         </div>
 
         {/* ====== 底部固定黑条 ====== */}

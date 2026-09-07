@@ -23,6 +23,8 @@ export const authAPI = {
 
 // ========== Show API ==========
 export const showAPI = {
+  getCategories: () => client.GET('/api/categories', {}),
+
   getShows: (params?: {
     PageIndex?: number;
     PageSize?: number;
@@ -121,6 +123,27 @@ export const userAPI = {
   // 更新头像
   updateAvatar: (data: { avatarUrl: string }) =>
     client.PUT('/api/users/me/avatar', { body: data }),
+
+  listRealNames: () => client.GET('/api/users/me/real-names', {}),
+
+  createRealName: (data: { realName: string; idCardNo: string; isDefault?: boolean }) =>
+    client.POST('/api/users/me/real-names', { body: data }),
+
+  updateRealName: (realNameId: number, data: { realName: string; idCardNo: string }) =>
+    client.PUT('/api/users/me/real-names/{realNameId}', {
+      params: { path: { realNameId } },
+      body: data,
+    }),
+
+  setDefaultRealName: (realNameId: number) =>
+    client.PATCH('/api/users/me/real-names/{realNameId}/default', {
+      params: { path: { realNameId } },
+    }),
+
+  deleteRealName: (realNameId: number) =>
+    client.DELETE('/api/users/me/real-names/{realNameId}', {
+      params: { path: { realNameId } },
+    }),
 };
 
 // ========== 退票 API ==========
