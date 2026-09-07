@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -27,6 +28,7 @@ using ShowtimeBackend.Services.Impl;
 using ShowtimeBackend.Services.SeatZone;
 using ShowtimeBackend.Services.MarketingContent;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Oracle.EntityFrameworkCore.Infrastructure;
@@ -297,6 +299,37 @@ builder.Services
         });
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
+
+// 反向代理（Nginx）信任策略：默认只信本机（127.0.0.0/8、::1/128），加上配置里
+// 显式声明的代理网段/地址。启用后 RemoteIpAddress/Request.Scheme 才是真实客户端值，
+// 异地登录检测与限流才能按真实 IP 判定（不可盲目信任所有 X-Forwarded-*）。
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Loopback, 8));
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.IPv6Loopback, 128));
+    foreach (var cidr in builder.Configuration
+        .GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [])
+    {
+        if (System.Net.IPNetwork.TryParse(cidr, out var network))
+        {
+            options.KnownIPNetworks.Add(network);
+        }
+    }
+
+    foreach (var address in builder.Configuration
+        .GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+    {
+        if (IPAddress.TryParse(address, out var ip))
+        {
+            options.KnownProxies.Add(ip);
+        }
+    }
+});
 builder.Services.AddApiRateLimiting(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, SubjectUserIdProvider>();
@@ -432,6 +465,9 @@ builder.Services.AddOpenApi(options =>
 });
 
 var app = builder.Build();
+
+// 必须在任何读取 RemoteIpAddress/Scheme 的中间件（异常处理/认证/限流/静态文件）之前执行。
+app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {

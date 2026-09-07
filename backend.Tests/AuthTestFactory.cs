@@ -145,6 +145,7 @@ public sealed class AuthTestFactory : WebApplicationFactory<Program>
                 ["Jwt:Audience"] = TestAudience,
                 ["Jwt:ExpirationMinutes"] = "15",
                 ["Jwt:RefreshTokenExpirationDays"] = "7",
+                ["Jwt:RefreshTokenReuseGraceSeconds"] = "30",
                 ["RateLimiting:LoginPerMinute"] = "5",
                 ["RateLimiting:RegisterPerMinute"] = "3",
                 ["RateLimiting:RefreshPerMinute"] = "10",

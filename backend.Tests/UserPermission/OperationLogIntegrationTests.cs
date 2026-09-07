@@ -69,6 +69,10 @@ public sealed class OperationLogIntegrationTests
         refreshResponse.EnsureSuccessStatusCode();
         var refreshed = (await AuthTestFactory
             .ReadResponseAsync<RefreshTokenResponse>(refreshResponse)).Data!;
+
+        // 轮换后推进时间超过宽限期，重放旧 token 才会被拒绝并写 REFRESH_TOKEN_REUSE 审计
+        // （宽限期内的重放被视为合法重试，这是防“并发刷新锁死会话”的修复）。
+        factory.AdvanceTime(TimeSpan.FromSeconds(31));
         var replay = await client.PostAsJsonAsync(
             "/api/auth/refresh",
             new RefreshTokenRequest { RefreshToken = login.RefreshToken });

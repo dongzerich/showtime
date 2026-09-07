@@ -18,6 +18,12 @@ public sealed partial class AuthService(
 {
     private const string DefaultRoleCode = "USER";
 
+    /// <summary>用于“账号不存在/不唯一”分支的等时假哈希，避免登录的计时侧信道/账号枚举。</summary>
+    private readonly string _dummyPasswordHash =
+        passwordHasher.HashPassword(
+            new SysUser { UserName = "__dummy__" },
+            "dummy-password-value");
+
     /// <summary>头像 URL 长度上限，与 SYS_USER.AVATAR_URL VARCHAR2(500 CHAR) 一致。</summary>
     private const int MaxAvatarUrlLength = 500;
 
@@ -144,6 +150,11 @@ public sealed partial class AuthService(
 
         if (matches.Count != 1)
         {
+            // 等时假哈希：与“密码错误”分支耗时一致，避免通过响应时间探测账号是否存在。
+            passwordHasher.VerifyHashedPassword(
+                new SysUser { UserName = "__dummy__" },
+                _dummyPasswordHash,
+                request.Password);
             return AuthServiceResult<LoginResponse>.Failed(
                 AuthFailure.InvalidCredentials);
         }

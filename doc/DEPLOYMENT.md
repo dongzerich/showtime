@@ -268,6 +268,20 @@ server {
 
 > HTTPS 建议通过 `certbot` 等工具配置 Let's Encrypt 证书。
 
+#### 后端 ForwardedHeaders 信任策略（近期新增）
+
+后端已启用 `UseForwardedHeaders`（仅信任 `X-Forwarded-For` / `X-Forwarded-Proto`，`ForwardLimit = 1`），默认**只信任本机回环地址**（`127.0.0.0/8`、`::1/128`，即 Nginx 与后端同宿主机 / 同机部署），因此上面的 `proxy_pass http://127.0.0.1:5146` 示例开箱即用，异地登录检测与限流会按真实客户端 IP 工作。
+
+- 若 Nginx 在容器/其他网段转发到后端，必须显式声明代理来源，否则 `X-Forwarded-For` 不会被采信（不会误信伪造头，但会退回代理 IP）：
+  ```bash
+  # 环境变量注入（示例：Docker bridge 172.16.0.0/12，按实际网段调整）
+  ForwardedHeaders__KnownNetworks__0=172.16.0.0/12
+  # 或指定单台代理地址：
+  ForwardedHeaders__KnownProxies__0=10.0.0.5
+  ```
+- **不要把后端端口（如 5146）直接暴露公网**，否则任何人都能直接绕过 Nginx 访问后端（此时 `KnownNetworks` 也不会影响直连来源的判定）。
+- 安全提示：不要信任整个公网网段；只填部署里真正的那台/那几台 Nginx 的地址。
+
 ---
 
 ## 6. 常见问题排查
