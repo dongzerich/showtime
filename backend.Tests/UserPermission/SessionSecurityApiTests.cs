@@ -71,7 +71,7 @@ public sealed class SessionSecurityApiTests
     }
 
     [Fact]
-    public async Task Refresh_RotatesToken_AndOldTokenReuseLocksSession()
+    public async Task Refresh_OldTokenReplayWithinGrace_RotatesAgainWithoutLocking()
     {
         using var factory = await CreateReadyFactoryAsync();
         using var client = factory.CreateApiClient();
@@ -85,12 +85,39 @@ public sealed class SessionSecurityApiTests
         var refreshed = (await AuthTestFactory
             .ReadResponseAsync<RefreshTokenResponse>(refreshResponse)).Data!;
         Assert.NotEqual(login.RefreshToken, refreshed.RefreshToken);
-        Authorize(client, refreshed.AccessToken);
-        Assert.Equal(
-            HttpStatusCode.OK,
-            (await client.GetAsync("/api/test-authorization/user")).StatusCode);
 
-        client.DefaultRequestHeaders.Authorization = null;
+        // 轮换刚发生（宽限期内）旧 token 重放：视为合法重试，再轮换一次并返回新 token，不锁会话。
+        var graceReplay = await client.PostAsJsonAsync(
+            "/api/auth/refresh",
+            new RefreshTokenRequest { RefreshToken = login.RefreshToken });
+        Assert.Equal(HttpStatusCode.OK, graceReplay.StatusCode);
+        var graceToken = (await AuthTestFactory
+            .ReadResponseAsync<RefreshTokenResponse>(graceReplay)).Data!;
+        Assert.NotEqual(login.RefreshToken, graceToken.RefreshToken);
+
+        Assert.True(await factory.ExecuteDbContextAsync(dbContext =>
+            dbContext.Set<UserSession>().AnyAsync(session =>
+                session.Status == UserSessionStatuses.Active && !session.RiskFlag)));
+    }
+
+    [Fact]
+    public async Task Refresh_OldTokenReplayBeyondGrace_RejectsWithoutLocking()
+    {
+        using var factory = await CreateReadyFactoryAsync();
+        using var client = factory.CreateApiClient();
+        await RegisterAsync(client, TestRequests.ValidRegistration());
+        var login = await LoginAsync(client, "alice");
+
+        var refreshResponse = await client.PostAsJsonAsync(
+            "/api/auth/refresh",
+            new RefreshTokenRequest { RefreshToken = login.RefreshToken });
+        refreshResponse.EnsureSuccessStatusCode();
+        var refreshed = (await AuthTestFactory
+            .ReadResponseAsync<RefreshTokenResponse>(refreshResponse)).Data!;
+        Assert.NotEqual(login.RefreshToken, refreshed.RefreshToken);
+
+        // 超过宽限期（30s）后重放旧 token：拒绝，但会话不再被锁死。
+        factory.AdvanceTime(TimeSpan.FromSeconds(31));
         var replay = await client.PostAsJsonAsync(
             "/api/auth/refresh",
             new RefreshTokenRequest { RefreshToken = login.RefreshToken });
@@ -99,19 +126,14 @@ public sealed class SessionSecurityApiTests
             .ReadResponseAsync<RefreshTokenResponse>(replay);
         Assert.Equal("AUTH_REFRESH_TOKEN_REUSED", replayBody.Code);
 
-        Authorize(client, refreshed.AccessToken);
-        Assert.Equal(
-            HttpStatusCode.Unauthorized,
-            (await client.GetAsync("/api/test-authorization/user")).StatusCode);
-        client.DefaultRequestHeaders.Authorization = null;
-        Assert.Equal(
-            HttpStatusCode.Unauthorized,
-            (await client.PostAsJsonAsync(
-                "/api/auth/refresh",
-                new RefreshTokenRequest
-                {
-                    RefreshToken = refreshed.RefreshToken,
-                })).StatusCode);
+        // 最新 token 仍可继续使用（会话保持 Active）。
+        var latest = await client.PostAsJsonAsync(
+            "/api/auth/refresh",
+            new RefreshTokenRequest { RefreshToken = refreshed.RefreshToken });
+        Assert.Equal(HttpStatusCode.OK, latest.StatusCode);
+        Assert.True(await factory.ExecuteDbContextAsync(dbContext =>
+            dbContext.Set<UserSession>().AnyAsync(session =>
+                session.Status == UserSessionStatuses.Active && !session.RiskFlag)));
     }
 
     [Fact]

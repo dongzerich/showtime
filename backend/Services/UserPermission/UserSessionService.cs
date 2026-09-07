@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using ShowtimeBackend.Common.Jwt;
 using ShowtimeBackend.Data;
@@ -143,42 +144,12 @@ public sealed class UserSessionService(
 
         if (updated == 1)
         {
-            var userId = await dbContext.Set<UserSession>()
-                .AsNoTracking()
-                .Where(session => session.UserSessionId == parsed.SessionId)
-                .Select(session => session.UserId)
-                .SingleAsync(cancellationToken);
-            var user = await dbContext.Set<SysUser>()
-                .AsNoTracking()
-                .Include(user => user.UserRoles)
-                .ThenInclude(userRole => userRole.Role)
-                .SingleOrDefaultAsync(
-                    candidate => candidate.UserId == userId,
-                    cancellationToken);
-
-            if (user is null || user.Status != 1)
-            {
-                await LockSessionAsync(parsed.SessionId, now, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return UserSessionResult<SessionRefreshData>.Failed(
-                    UserSessionFailure.AccountUnavailable);
-            }
-
-            var roleCodes = user.UserRoles
-                .Where(userRole => userRole.Role.Status)
-                .Select(userRole => userRole.Role.RoleCode)
-                .Distinct(StringComparer.Ordinal)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            await transaction.CommitAsync(cancellationToken);
-            return UserSessionResult<SessionRefreshData>.Succeeded(
-                new SessionRefreshData(
-                    parsed.SessionId,
-                    nextToken.RawToken,
-                    nextToken.ExpiresAtUtc,
-                    user,
-                    roleCodes));
+            return await CompleteRotationAsync(
+                parsed.SessionId,
+                nextToken,
+                now,
+                transaction,
+                cancellationToken);
         }
 
         var sessionState = await dbContext.Set<UserSession>()
@@ -217,8 +188,26 @@ public sealed class UserSessionService(
                 sessionState.SessionToken,
                 parsed.TokenHash))
         {
-            await LockSessionAsync(parsed.SessionId, now, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            // 轮换刚发生（并发双发/网络重试）时，旧 token 重放按合法重试处理：
+            // 再轮换一次并返回新 token，而不是把会话锁死（单次重放即锁整会话是
+            // 可被旧 token 持有者利用的拒绝服务向量）。
+            if (await TryRotateWithinReuseGraceAsync(
+                    sessionState,
+                    nextToken,
+                    now,
+                    cancellationToken))
+            {
+                return await CompleteRotationAsync(
+                    parsed.SessionId,
+                    nextToken,
+                    now,
+                    transaction,
+                    cancellationToken);
+            }
+
+            // 超出宽限期的旧 token 重放：拒绝但不再锁会话（避免重试/多标签页导致用户被锁死），
+            // 仅记录审计事件供安全分析（先回滚事务，避免审计写入被未提交的写锁阻塞）。
+            await transaction.RollbackAsync(cancellationToken);
             await operationLogWriter.WriteBestEffortAsync(
                 new OperationLogWriteRequest(
                     Module: "AUTH",
@@ -283,6 +272,90 @@ public sealed class UserSessionService(
                     .SetProperty(candidate => candidate.UpdateBy, "expiration"),
                 cancellationToken);
         return false;
+    }
+
+    private async Task<UserSessionResult<SessionRefreshData>> CompleteRotationAsync(
+        long sessionId,
+        IssuedRefreshToken nextToken,
+        DateTime now,
+        IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        var userId = await dbContext.Set<UserSession>()
+            .AsNoTracking()
+            .Where(session => session.UserSessionId == sessionId)
+            .Select(session => session.UserId)
+            .SingleAsync(cancellationToken);
+        var user = await dbContext.Set<SysUser>()
+            .AsNoTracking()
+            .Include(user => user.UserRoles)
+            .ThenInclude(userRole => userRole.Role)
+            .SingleOrDefaultAsync(
+                candidate => candidate.UserId == userId,
+                cancellationToken);
+
+        if (user is null || user.Status != 1)
+        {
+            await LockSessionAsync(sessionId, now, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return UserSessionResult<SessionRefreshData>.Failed(
+                UserSessionFailure.AccountUnavailable);
+        }
+
+        var roleCodes = user.UserRoles
+            .Where(userRole => userRole.Role.Status)
+            .Select(userRole => userRole.Role.RoleCode)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        await transaction.CommitAsync(cancellationToken);
+        return UserSessionResult<SessionRefreshData>.Succeeded(
+            new SessionRefreshData(
+                sessionId,
+                nextToken.RawToken,
+                nextToken.ExpiresAtUtc,
+                user,
+                roleCodes));
+    }
+
+    /// <summary>
+    /// 当轮换竞态仅发生一次（并发双发/网络重试）时，把仍处于宽限期的旧 token
+    /// 视作合法重试再轮换一次；条件更新以读到的当前 SessionToken 为约束，
+    /// 避免与另一并发轮换互相覆盖。
+    /// </summary>
+    private async Task<bool> TryRotateWithinReuseGraceAsync(
+        UserSession sessionState,
+        IssuedRefreshToken nextToken,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (!IsWithinReuseGrace(sessionState, now))
+        {
+            return false;
+        }
+
+        return await dbContext.Set<UserSession>()
+            .Where(session => session.UserSessionId == sessionState.UserSessionId
+                && session.Status == UserSessionStatuses.Active
+                && session.ExpireTime > now
+                && session.SessionToken == sessionState.SessionToken)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(
+                        session => session.SessionToken,
+                        nextToken.TokenHash)
+                    .SetProperty(session => session.ExpireTime, nextToken.ExpiresAtUtc)
+                    .SetProperty(session => session.UpdateTime, now)
+                    .SetProperty(session => session.UpdateBy, "refresh"),
+                cancellationToken) == 1;
+    }
+
+    private bool IsWithinReuseGrace(UserSession session, DateTime now)
+    {
+        var graceSeconds = _jwtOptions.RefreshTokenReuseGraceSeconds;
+        return graceSeconds > 0
+            && session.UpdateTime >= now.AddSeconds(-graceSeconds);
     }
 
     public Task<int> LogoutCurrentAsync(

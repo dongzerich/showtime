@@ -43,7 +43,7 @@ public sealed class UserSessionServiceTests
     }
 
     [Fact]
-    public async Task ConcurrentRefresh_AllowsAtMostOneSuccessAndLocksSession()
+    public async Task ConcurrentRefresh_AllowsBothWithinGrace_SessionStaysActive()
     {
         await using var database = await SharedSessionDatabase.CreateAsync();
         var userId = await database.SeedUserAsync();
@@ -67,19 +67,71 @@ public sealed class UserSessionServiceTests
                 refreshToken,
                 CancellationToken.None));
 
-        Assert.Single(results, result => result.IsSuccess);
-        Assert.Single(
-            results,
-            result => result.Failure == UserSessionFailure.TokenReused);
+        // 并发双发同一旧 token：第一个正常轮换，第二个命中宽限期再轮换一次，
+        // 两者都应成功，且会话保持 Active（不再因单次重放锁死会话）。
+        Assert.All(results, result => Assert.True(result.IsSuccess));
         await using var assertionContext = database.CreateContext();
         var session = await assertionContext.Set<UserSession>()
             .AsNoTracking()
             .SingleAsync();
-        Assert.Equal(UserSessionStatuses.Locked, session.Status);
-        Assert.True(session.RiskFlag);
+        Assert.Equal(UserSessionStatuses.Active, session.Status);
+        Assert.False(session.RiskFlag);
     }
 
-    private static UserSessionService CreateService(AppDbContext context)
+    [Fact]
+    public async Task OldTokenReuseBeyondGrace_IsRejectedWithoutLockingSession()
+    {
+        await using var database = await SharedSessionDatabase.CreateAsync();
+        var userId = await database.SeedUserAsync();
+        string refreshToken;
+        string rotatedToken;
+        await using (var setupContext = database.CreateContext())
+        {
+            var issued = await CreateService(setupContext).StartAsync(
+                userId,
+                new ClientRequestMetadata("192.0.2.10", "Device-A"),
+                CancellationToken.None);
+            refreshToken = issued.Value!.RefreshToken;
+        }
+
+        await using (var rotateContext = database.CreateContext())
+        {
+            var rotated = await CreateService(rotateContext).RotateAsync(
+                refreshToken,
+                CancellationToken.None);
+            Assert.True(rotated.IsSuccess);
+            rotatedToken = rotated.Value!.RefreshToken;
+        }
+
+        await using (var replayContext = database.CreateContext())
+        {
+            var replay = await CreateService(replayContext, graceSeconds: 0).RotateAsync(
+                refreshToken,
+                CancellationToken.None);
+            Assert.False(replay.IsSuccess);
+            Assert.Equal(UserSessionFailure.TokenReused, replay.Failure);
+        }
+
+        // 会话仍在：最新 token 继续可用。
+        await using (var latestContext = database.CreateContext())
+        {
+            var latest = await CreateService(latestContext).RotateAsync(
+                rotatedToken,
+                CancellationToken.None);
+            Assert.True(latest.IsSuccess);
+        }
+
+        await using var assertionContext = database.CreateContext();
+        var session = await assertionContext.Set<UserSession>()
+            .AsNoTracking()
+            .SingleAsync();
+        Assert.Equal(UserSessionStatuses.Active, session.Status);
+        Assert.False(session.RiskFlag);
+    }
+
+    private static UserSessionService CreateService(
+        AppDbContext context,
+        int graceSeconds = 30)
     {
         var options = Options.Create(new JwtOptions
         {
@@ -88,6 +140,7 @@ public sealed class UserSessionServiceTests
             Audience = AuthTestFactory.TestAudience,
             ExpirationMinutes = 15,
             RefreshTokenExpirationDays = 7,
+            RefreshTokenReuseGraceSeconds = graceSeconds,
         });
         return new UserSessionService(
             context,

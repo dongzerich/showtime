@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -86,7 +88,12 @@ public sealed class AuthController(
                 OperationType: "LOGIN",
                 Succeeded: false,
                 CostTimeMilliseconds: costTime,
-                RequestSummary: new { AccountType = GetAccountType(request.Account) },
+                RequestSummary: new
+                {
+                    AccountType = GetAccountType(request.Account),
+                    // 只记哈希不记明文账号，供爆破/撞库按账号回溯，避免把账号明文落审计表。
+                    AccountHash = HashAccount(request.Account),
+                },
                 ResponseSummary: new { ResultCode = ToLogCode(result.Failure) },
                 ErrorMessage: ToLogCode(result.Failure)),
             cancellationToken);
@@ -270,6 +277,12 @@ public sealed class AuthController(
             ? "PHONE"
             : "USERNAME";
     }
+
+    /// <summary>对账号做规范化（去空白/小写）后的 SHA-256 哈希，用于审计回溯而不落明文账号。</summary>
+    private static string HashAccount(string account) =>
+        Convert.ToHexString(
+            SHA256.HashData(
+                Encoding.UTF8.GetBytes(account.Trim().ToLowerInvariant())));
 
     private static string ToLogCode(AuthFailure failure) => failure switch
     {

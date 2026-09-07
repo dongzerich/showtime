@@ -1,4 +1,7 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using ShowtimeBackend.Common;
 using ShowtimeBackend.Data;
@@ -17,10 +20,15 @@ public sealed class ExchangeApplicationService(
     TimeProvider timeProvider,
     IExchangeLockCoordinator? lockCoordinator = null,
     IOptions<ExchangeOptions>? options = null,
-    ISeatLockGuard? seatLockGuard = null) : IExchangeApplicationService
+    ISeatLockGuard? seatLockGuard = null,
+    IOrderTicketAuditSink? auditSink = null,
+    ILogger<ExchangeApplicationService>? logger = null) : IExchangeApplicationService
 {
     private const decimal MaxOracleAmount = 99_999_999.99m;
     private readonly ExchangeOptions exchangeOptions = options?.Value ?? new ExchangeOptions();
+    private readonly IOrderTicketAuditSink auditSink = auditSink ?? new NullOrderTicketAuditSink();
+    private readonly ILogger<ExchangeApplicationService> logger =
+        logger ?? NullLogger<ExchangeApplicationService>.Instance;
 
     public async Task<OrderTicketResult<ExchangeQuoteResponse>> QuoteAsync(
         long userId,
@@ -425,6 +433,14 @@ public sealed class ExchangeApplicationService(
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
+            await WriteExchangeRequestedAuditAsync(
+                orderId,
+                exchange.ExchangeId,
+                quote,
+                actor,
+                now,
+                cancellationToken);
+
             if (seatLockGuard is not null)
             {
                 foreach (var item in request.TargetItems)
@@ -644,6 +660,44 @@ public sealed class ExchangeApplicationService(
 
     private static string CreateBusinessNumber(string prefix, DateTime now) =>
         $"{prefix}{now:yyyyMMddHHmmssfff}{Guid.NewGuid():N}"[..28].ToUpperInvariant();
+
+    private async Task WriteExchangeRequestedAuditAsync(
+        long orderId,
+        long exchangeId,
+        ExchangeQuoteResponse quote,
+        string actor,
+        DateTime occurredAt,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await auditSink.WriteAsync(
+                new OrderTicketAuditEvent(
+                    "EXCHANGE_REQUESTED",
+                    orderId,
+                    actor,
+                    quote.Items.Count,
+                    occurredAt,
+                    Metadata: new Dictionary<string, string>
+                    {
+                        ["ExchangeId"] = exchangeId.ToString(CultureInfo.InvariantCulture),
+                        ["TargetSessionId"] = quote.TargetSessionId.ToString(CultureInfo.InvariantCulture),
+                        ["ApproveStatus"] = "PENDING",
+                        ["ExchangeStatus"] = "PENDING",
+                        ["ExchangeFee"] = quote.ExchangeFee.ToString(CultureInfo.InvariantCulture),
+                        ["PriceDiff"] = quote.PriceDiff.ToString(CultureInfo.InvariantCulture),
+                    }),
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Order-ticket audit sink failed for exchange request {ExchangeId} on order {OrderId}.",
+                exchangeId,
+                orderId);
+        }
+    }
 
     private async Task RollbackAndClearAsync(
         Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
