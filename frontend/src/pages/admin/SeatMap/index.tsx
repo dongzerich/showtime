@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Select,
   Card,
@@ -21,6 +22,7 @@ import {
   EditOutlined,
   ReloadOutlined,
   SaveOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import {
   getSeatMapList,
@@ -30,10 +32,13 @@ import {
   deleteSeat,
   batchUpdateSeats,
   updateSeat,
+  getSeatRuleList,
+  getSeatRuleScopes,
   type SeatMapResponse,
   type SeatSectionResponse,
   type SeatResponse,
   type SeatRequest,
+  type SeatRuleScope,
 } from '../../../api/admin';
 
 const SEAT_TYPES = [
@@ -50,6 +55,7 @@ const SEAT_STATUSES = [
 ];
 
 const SeatMapEditor = () => {
+  const navigate = useNavigate();
   const [seatMaps, setSeatMaps] = useState<SeatMapResponse[]>([]);
   const [selectedMapId, setSelectedMapId] = useState<number | null>(null);
   const [sections, setSections] = useState<SeatSectionResponse[]>([]);
@@ -57,6 +63,7 @@ const SeatMapEditor = () => {
   const [seats, setSeats] = useState<SeatResponse[]>([]);
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [selectedSeatIds, setSelectedSeatIds] = useState<Set<number>>(new Set());
+  const [appliedRuleNames, setAppliedRuleNames] = useState<string[]>([]);
 
   // 图形视图相关
   const [viewMode, setViewMode] = useState<'table' | 'canvas'>('table');
@@ -79,16 +86,42 @@ const SeatMapEditor = () => {
     }).catch(() => message.error('加载座位图列表失败'));
   }, []);
 
+  const loadAppliedRules = useCallback(async (mapId: number | null, sectionId: number | null) => {
+    if (!mapId) {
+      setAppliedRuleNames([])
+      return
+    }
+    try {
+      const rulesRes = await getSeatRuleList({ RuleStatus: 'ENABLED', PageSize: 100 })
+      const rules = rulesRes.data?.data?.items || []
+      const names: string[] = []
+      for (const rule of rules) {
+        const scopesRes = await getSeatRuleScopes(Number(rule.seatRuleId))
+        const scopes: SeatRuleScope[] = scopesRes.data?.data || []
+        const hit = scopes.some(scope =>
+          (scope.scopeType === 'MAP' && Number(scope.seatMapId) === mapId) ||
+          (scope.scopeType === 'SECTION' && sectionId != null && Number(scope.seatSectionId) === sectionId),
+        )
+        if (hit) names.push(rule.ruleName)
+      }
+      setAppliedRuleNames(names)
+    } catch {
+      setAppliedRuleNames([])
+    }
+  }, [])
+
   const handleMapChange = useCallback((mapId: number) => {
     setSelectedMapId(mapId);
     setSelectedSectionId(null);
     setSeats([]);
     setSelectedSeatIds(new Set());
     setModifiedCoords(new Map());
+    setAppliedRuleNames([]);
     getSeatSections(mapId, { PageSize: 100 }).then(res => {
       if (res.data?.data?.items) setSections(res.data.data.items);
     }).catch(() => message.error('加载票区列表失败'));
-  }, []);
+    loadAppliedRules(mapId, null);
+  }, [loadAppliedRules]);
 
   const loadSeats = useCallback((sectionId: number) => {
     setLoadingSeats(true);
@@ -103,7 +136,8 @@ const SeatMapEditor = () => {
     setSelectedSeatIds(new Set());
     setModifiedCoords(new Map());
     if (sectionId) loadSeats(sectionId);
-  }, [loadSeats]);
+    loadAppliedRules(selectedMapId, sectionId || null);
+  }, [loadSeats, loadAppliedRules, selectedMapId]);
 
   const handleAdd = async () => {
     if (!selectedSectionId) return;
@@ -362,8 +396,27 @@ const SeatMapEditor = () => {
           <Button icon={<ReloadOutlined />} onClick={() => selectedSectionId && loadSeats(selectedSectionId)} disabled={!selectedSectionId}>
             刷新
           </Button>
+          <Button icon={<AppstoreOutlined />} onClick={() => navigate('/admin/seat-rule')}>
+            座位规则
+          </Button>
         </Space>
       </Card>
+
+      {selectedSectionId && (
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Space>
+            <span style={{ color: '#666' }}>命中规则：</span>
+            {appliedRuleNames.length > 0 ? (
+              appliedRuleNames.map(name => <Tag key={name} color="blue">{name}</Tag>)
+            ) : (
+              <span style={{ color: '#999' }}>无（该座位图/票区未绑定座位规则）</span>
+            )}
+            <Button type="link" size="small" icon={<AppstoreOutlined />} onClick={() => navigate('/admin/seat-rule')}>
+              管理座位规则
+            </Button>
+          </Space>
+        </Card>
+      )}
 
       {selectedSectionId && (
         <Card size="small" style={{ marginBottom: 16 }}>
