@@ -121,7 +121,7 @@ const PerformanceDetail = () => {
       {/* ====== 下方内容区 ====== */}
       <div className="detail-body">
         <div className="detail-section">
-          <h2>🎬 演出详情</h2>
+          <h2><img src="/show.png" alt="" />演出详情</h2>
           <Divider />
           <div className="detail-info-grid">
             <div className="info-item">
@@ -153,7 +153,7 @@ const PerformanceDetail = () => {
 
         {show.description && (
           <div className="detail-section">
-            <h2>📖 详细介绍</h2>
+            <h2><img src="/introduce.png" alt="" />详细介绍</h2>
             <Divider />
             <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{show.description}</p>
           </div>

@@ -32,7 +32,7 @@ const Register = () => {
       }
 
       if (data?.success && data?.data) {
-        message.success('注册成功！请登录 🎉');
+        message.success('注册成功！请登录');
         setTimeout(() => {
           navigate('/login');
         }, 500);
@@ -62,7 +62,12 @@ const Register = () => {
       }}
     >
       <Card
-        title="🎫 用户注册"
+        title={
+          <span>
+            <img src="/icon.png" alt="" style={{ height: 20, marginRight: 8, verticalAlign: -3 }} />
+            用户注册
+          </span>
+        }
         style={{ width: 420, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
         headStyle={{ textAlign: 'center', fontSize: '20px' }}
       >

@@ -124,6 +124,13 @@
   color: #1a1a2e;
 }
 
+.detail-section h2 img {
+  height: 20px;
+  width: auto;
+  margin-right: 8px;
+  vertical-align: -3px;
+}
+
 /* 轮播图 */
 .detail-gallery {
   max-width: 800px;

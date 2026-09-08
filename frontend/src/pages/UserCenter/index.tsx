@@ -274,11 +274,10 @@ const UserCenter = () => {
       {/* 顶部返回栏（取代导航栏） */}
       <div className="uc-topbar">
         <div className="uc-topbar-content">
-          <span className="uc-logo" onClick={() => navigate('/')}>
-            🎫 ShowTime
-          </span>
+          <img className="uc-logo" src="/logo.png" alt="ShowTime" onClick={() => navigate('/')} />
           <span className="uc-back" onClick={() => navigate('/')}>
-            ← 返回首页
+            <img className="uc-back-icon" src="/return.png" alt="" />
+            返回首页
           </span>
         </div>
       </div>

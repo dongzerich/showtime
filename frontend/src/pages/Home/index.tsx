@@ -102,7 +102,7 @@ const Home = () => {
           <Title level={1} style={{ color: 'white', margin: 0 }}>
             {shows[0].showName}
           </Title>
-          <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 18 }}>
+          <Text className="hero-sub">
             {shows[0].description || '精彩演出，即将上演'}
           </Text>
           <Button
@@ -159,7 +159,7 @@ const Home = () => {
                 >
                   <Card.Meta
                     title={show.showName}
-                    description={show.description?.slice(0, 30) || ''}
+                    description={<div className="home-card-desc">{show.description || ''}</div>}
                   />
                 </Card>
               </Col>
@@ -169,43 +169,43 @@ const Home = () => {
           <Empty description="暂无热门演出" />
         )}
 
-        {/* ====== 近期演出 ====== */}
-        <div className="section-header" style={{ marginTop: 48 }}>
-          <Title level={3}>
-            <CalendarOutlined /> 近期演出
-          </Title>
-          <Button type="link" onClick={() => navigate('/search')}>
-            查看全部 &gt;
-          </Button>
-        </div>
+        {/* ====== 近期演出：仅有剩余演出时展示，避免空区块误导 ====== */}
+        {upcomingShows.length > 0 && (
+          <>
+            <div className="section-header" style={{ marginTop: 48 }}>
+              <Title level={3}>
+                <CalendarOutlined /> 近期演出
+              </Title>
+              <Button type="link" onClick={() => navigate('/search')}>
+                查看全部 &gt;
+              </Button>
+            </div>
 
-        {upcomingShows.length > 0 ? (
-          <Row gutter={[24, 24]}>
-            {upcomingShows.map((show) => (
-              <Col key={show.showId} xs={12} sm={12} md={8} lg={6}>
-                <Card
-                  hoverable
-                  cover={
-                    <img
-                      alt={show.showName}
-                      loading="lazy"
-                      decoding="async"
-                      src={getPoster(show)}
-                      style={{ height: 180, objectFit: 'cover' }}
+            <Row gutter={[24, 24]}>
+              {upcomingShows.map((show) => (
+                <Col key={show.showId} xs={12} sm={12} md={8} lg={6}>
+                  <Card
+                    hoverable
+                    cover={
+                      <img
+                        alt={show.showName}
+                        loading="lazy"
+                        decoding="async"
+                        src={getPoster(show)}
+                        style={{ height: 180, objectFit: 'cover' }}
+                      />
+                    }
+                    onClick={() => navigate(`/performance/${show.showId}`)}
+                  >
+                    <Card.Meta
+                      title={show.showName}
+                      description={<div className="home-card-desc">{show.description || ''}</div>}
                     />
-                  }
-                  onClick={() => navigate(`/performance/${show.showId}`)}
-                >
-                  <Card.Meta
-                    title={show.showName}
-                    description={show.description?.slice(0, 20) || ''}
-                  />
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        ) : (
-          <Empty description="暂无近期演出" />
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </>
         )}
       </div>
     </div>

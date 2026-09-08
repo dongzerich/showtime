@@ -13,7 +13,9 @@ const Layout = () => {
     <div className="layout-container">
       <header className="header-nav">
         <div className="nav-content">
-          <div className="logo" onClick={() => navigate('/')}>🎫 ShowTime</div>
+          <div className="logo" onClick={() => navigate('/')}>
+            <img src="/logo.png" alt="ShowTime" />
+          </div>
           <div className="nav-links">
             <span
               className={location.pathname === '/' ? 'active' : ''}
