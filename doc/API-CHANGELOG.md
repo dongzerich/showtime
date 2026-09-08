@@ -163,6 +163,7 @@
 | POST | `/api/admin/sessions/{sessionId}/dynamic-pricing-rules` | 动态调价 |
 | PUT | `/api/admin/sessions/{sessionId}/status` | 场次状态 |
 | GET/POST | `/api/admin/seat-maps` | 座位图 |
+| GET | `/api/admin/venues` | 场馆列表（启用中） |
 | GET/PUT/DELETE | `/api/admin/seat-maps/{id}` | 座位图 |
 | GET/POST | `/api/admin/seat-maps/{id}/sections` | 分区 |
 | GET/PUT/DELETE | `/api/admin/seat-sections/{id}` | 分区 |
