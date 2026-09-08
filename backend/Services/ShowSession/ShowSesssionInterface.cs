@@ -38,6 +38,11 @@ public interface IAdminShowSessionService
     Task<ShowSessionDto> CreateSessionAsync(long showId, CreateShowSessionRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 编辑场次基础排期信息
+    /// </summary>
+    Task<ShowSessionDto> UpdateSessionAsync(long sessionId, UpdateShowSessionRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 为场次批量配置区域票价策略
     /// </summary>
     Task ConfigurePriceStrategiesAsync(long sessionId, IEnumerable<CreatePriceStrategyRequest> requests, string operatorName = "admin", CancellationToken cancellationToken = default);
@@ -53,6 +58,11 @@ public interface IAdminShowSessionService
     Task<bool> UpdateSessionStatusAsync(long sessionId, SessionStatus newStatus, CancellationToken cancellationToken = default);
 
     Task<IEnumerable<ShowSessionDto>> GetAdminSessionsByShowIdAsync(long showId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 获取场次全部基础票价策略（管理端维护用，含禁用档与售票窗口）
+    /// </summary>
+    Task<IEnumerable<AdminPriceStrategyDto>> GetAdminPricingStrategiesAsync(long sessionId, CancellationToken cancellationToken = default);
 }
 
 public interface IAdminShowService
@@ -62,4 +72,9 @@ public interface IAdminShowService
     Task<bool> DeleteShowAsync(long showId, CancellationToken cancellationToken = default);
     Task<ShowDto> GetShowByIdAsync(long showId, CancellationToken cancellationToken = default);
     Task<PagedResponse<ShowDto>> GetShowsAsync(ShowQueryRequest query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 更新演出审核状态（通过/驳回）；驳回已发布演出时会自动下架
+    /// </summary>
+    Task<bool> SetShowAuditStatusAsync(long showId, ShowAuditStatus auditStatus, CancellationToken cancellationToken = default);
 }

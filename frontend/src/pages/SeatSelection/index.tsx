@@ -15,6 +15,15 @@ const SEAT_STATUS_MAP: Record<string, { label: string; className: string }> = {
   UNAVAILABLE: { label: '不可用', className: 'unavailable' },
 };
 
+// 票种档位名称（后端当前生效档决定展示哪一档）
+const PRICE_TYPE_TEXT: Record<string, string> = {
+  EARLY_BIRD: '早鸟票',
+  PRESALE: '预售票',
+  STANDARD: '标准票',
+  VIP: 'VIP票',
+  MEMBER: '会员票',
+};
+
 // 按座位图坐标渲染的常量：座位块尺寸与顶部舞台高度
 const SEAT_SIZE = 30;
 const STAGE_HEIGHT = 64;
@@ -207,6 +216,14 @@ const SeatSelection = () => {
       return;
     }
     setSelectedSeats([...selectedSeats, seatId]);
+  };
+
+  // ========== 获取座位当前生效票档名称 ==========
+  const getSeatTierLabel = (seat: SessionSeatMapSeatDto): string => {
+    const strategy = pricingStrategies.find(
+      (s) => s.seatSectionId === seat.seatSectionId
+    );
+    return (strategy && PRICE_TYPE_TEXT[strategy.priceType]) || '';
   };
 
   // ========== 获取座位价格 ==========
@@ -498,6 +515,7 @@ const SeatSelection = () => {
               statusInfo = SEAT_STATUS_MAP[statusKey] || { label: '未知', className: 'unknown' };
             }
             const price = getSeatPrice(seat);
+            const tierLabel = getSeatTierLabel(seat);
             const seatLabel = seat.seatNo || `${seat.rowCode}${seat.colIndex}`;
             const coord = coordOf(seat);
 
@@ -506,7 +524,7 @@ const SeatSelection = () => {
                 key={seat.seatId}
                 className={`seat ${statusInfo.className} ${isSelected ? 'selected' : ''}`}
                 onClick={() => handleSeatClick(seat)}
-                title={`${seat.sectionName || ''} ${seatLabel} - ${statusInfo.label}${price > 0 ? ` ¥${price}` : ''}`}
+                title={`${seat.sectionName || ''} ${seatLabel} - ${statusInfo.label}${price > 0 ? `（${tierLabel || '当前档'} ¥${price}）` : ''}`}
                 style={{
                   left: coord.x,
                   top: coord.y,

@@ -47,6 +47,12 @@ export const showSessionAPI = {
     client.GET('/api/client/sessions/{sessionId}/pricing-strategies', { params: { path: { sessionId } } }),
 };
 
+// ========== 营销内容 API（用户端：按演出获取生效营销内容） ==========
+export const marketingAPI = {
+  getShowMarketing: (showId: number) =>
+    client.GET('/api/client/shows/{showId}/marketing-contents', { params: { path: { showId } } }),
+};
+
 // ========== Session API ==========
 export const sessionAPI = {
   getSessionSeatMap: (sessionId: number) =>

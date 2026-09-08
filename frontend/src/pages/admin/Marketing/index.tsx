@@ -21,9 +21,11 @@ import {
   createMarketingContent,
   updateMarketingContent,
   deleteMarketingContent,
+  getShowList,
   type MarketingContentDto,
   type MarketingContentType,
   type MarketingContentStatus,
+  type ShowDto,
 } from '../../../api/admin'
 
 const { TextArea } = Input
@@ -50,6 +52,7 @@ const Marketing = () => {
   const [searchContentType, setSearchContentType] = useState<MarketingContentType | undefined>()
   const [searchStatus, setSearchStatus] = useState<MarketingContentStatus | undefined>()
   const [searchShowId, setSearchShowId] = useState<number | undefined>()
+  const [shows, setShows] = useState<ShowDto[]>([])
 
   const loadData = async (page = 1, pageSize = 10) => {
     setLoading(true)
@@ -81,6 +84,24 @@ const Marketing = () => {
   useEffect(() => {
     loadData(1)
   }, [])
+
+  // 加载演出列表，用于选择/展示关联演出名称
+  useEffect(() => {
+    const loadShows = async () => {
+      try {
+        const res = await getShowList({ PageSize: 100 })
+        if (res.data?.data) {
+          setShows(res.data.data.items || [])
+        }
+      } catch {
+        message.error('加载演出列表失败')
+      }
+    }
+    void loadShows()
+  }, [])
+
+  const findShow = (showId: number | string | undefined) =>
+    shows.find(s => Number(s.showId) === Number(showId))
 
   const handleAdd = () => {
     setEditingItem(null)
@@ -171,10 +192,19 @@ const Marketing = () => {
       width: 80,
     },
     {
-      title: '演出ID',
+      title: '关联演出',
       dataIndex: 'showId',
       key: 'showId',
-      width: 90,
+      width: 220,
+      render: (id: number) => {
+        const show = findShow(id)
+        return (
+          <div>
+            <div>{show?.showName || `演出 #${id}`}</div>
+            {show && <div style={{ color: '#999', fontSize: 12 }}>ID: {id}</div>}
+          </div>
+        )
+      },
     },
     {
       title: '类型',
@@ -254,13 +284,21 @@ const Marketing = () => {
             onPressEnter={() => loadData(1)}
             allowClear
           />
-          <InputNumber
-            placeholder="演出ID"
+          <Select
+            placeholder="选择演出"
             value={searchShowId}
             onChange={v => setSearchShowId(v ?? undefined)}
-            style={{ width: 120 }}
-            onPressEnter={() => loadData(1)}
-          />
+            style={{ width: 200 }}
+            allowClear
+            showSearch
+            optionFilterProp="children"
+          >
+            {shows.map(show => (
+              <Select.Option key={show.showId} value={Number(show.showId)}>
+                {show.showName}（ID: {show.showId}）
+              </Select.Option>
+            ))}
+          </Select>
           <Select
             placeholder="类型"
             value={searchContentType}
@@ -317,11 +355,21 @@ const Marketing = () => {
         <Form form={form} layout="vertical" style={{ marginTop: 16 }} initialValues={{ sortOrder: 0, status: 'ENABLED' }}>
           {!editingItem && (
             <Form.Item
-              label="演出 ID"
+              label="关联演出"
               name="showId"
-              rules={[{ required: true, message: '请输入演出 ID' }]}
+              rules={[{ required: true, message: '请选择关联演出' }]}
             >
-              <InputNumber style={{ width: '100%' }} placeholder="关联的演出 showId" />
+              <Select
+                placeholder="搜索并选择演出"
+                showSearch
+                optionFilterProp="children"
+              >
+                {shows.map(show => (
+                  <Select.Option key={show.showId} value={Number(show.showId)}>
+                    {show.showName}（ID: {show.showId}）
+                  </Select.Option>
+                ))}
+              </Select>
             </Form.Item>
           )}
           <Form.Item

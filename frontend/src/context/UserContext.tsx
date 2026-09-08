@@ -8,6 +8,7 @@ export interface User {
   avatar: string;
   phone: string;
   email: string;
+  roles: string[];
 }
 
 const emptyUser: User = {
@@ -17,6 +18,7 @@ const emptyUser: User = {
   avatar: '',
   phone: '',
   email: '',
+  roles: [],
 };
 
 interface UserContextType {
@@ -39,6 +41,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         id: Number(parsed.userId ?? parsed.id ?? 0),
         username: parsed.userName ?? parsed.username ?? '',
         avatar: parsed.avatarUrl ?? parsed.avatar ?? '',
+        roles: Array.isArray(parsed.roles) ? parsed.roles.map(String) : [],
       };
     } catch {
       return emptyUser;

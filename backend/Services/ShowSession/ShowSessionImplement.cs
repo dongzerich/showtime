@@ -71,11 +71,18 @@ public class ShowSessionService : IClientShowSessionService
         // 展示价算力取当前 UTC 时间
         var evaluationTime = _timeProvider.GetUtcNow().UtcDateTime;
 
-        return strategies.Select(p =>
+        // 方案 A：同一票区同一时刻只展示/返回一个“当前生效档”，按售票窗口 + 优先级 + 票种序裁决
+        var effectiveStrategies = strategies
+            .GroupBy(p => p.SeatSectionId)
+            .Select(g => PricingTierSelector.SelectEffective(g, g.Key, evaluationTime))
+            .OfType<PriceStrategy>()
+            .ToList();
+
+        return effectiveStrategies.Select(p =>
         {
             decimal finalPrice = session != null
-                ? PricingChange.CalculateRealtimePrice(p.Price, session.StartTime, evaluationTime, p.SeatSectionId, dynamicRules)
-                : p.Price;
+                ? PricingChange.CalculateRealtimePrice(p!.Price, session.StartTime, evaluationTime, p.SeatSectionId, dynamicRules)
+                : p!.Price;
 
             return new PricingStrategyDto(
                 p.PriceStrategyId,
@@ -145,6 +152,47 @@ public class AdminShowSessionService : IAdminShowSessionService
         return ToDto(sessionEntity);
     }
 
+    public async Task<ShowSessionDto> UpdateSessionAsync(
+        long sessionId,
+        UpdateShowSessionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _context.ShowSessions
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"未找到 ID 为 {sessionId} 的场次");
+        }
+
+        if (request.StartTime >= request.EndTime)
+            throw new ArgumentException("演出结束时间必须晚于开始时间");
+
+        if (request.SaleStartTime >= request.SaleEndTime)
+            throw new ArgumentException("预售结束时间必须晚于预售开始时间");
+
+        bool hasConflict = await _context.ShowSessions.CountAsync(s =>
+            s.SessionId != sessionId &&
+            s.SeatMapId == request.SeatMapId &&
+            s.SessionStatus != SessionStatus.ENDED.ToDbString() &&
+            request.StartTime < s.EndTime && request.EndTime > s.StartTime,
+            cancellationToken) > 0;
+
+        if (hasConflict)
+            throw new InvalidOperationException("该场地在指定时间段内已存在其他场次排期");
+
+        session.StartTime = request.StartTime;
+        session.EndTime = request.EndTime;
+        session.SaleStartTime = request.SaleStartTime;
+        session.SaleEndTime = request.SaleEndTime;
+        session.SeatMapId = request.SeatMapId;
+        session.UpdateTime = DateTime.UtcNow;
+
+        _context.ShowSessions.Update(session);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ToDto(session);
+    }
+
     public async Task ConfigurePriceStrategiesAsync(
         long sessionId,
         IEnumerable<CreatePriceStrategyRequest> requests,
@@ -199,7 +247,7 @@ public class AdminShowSessionService : IAdminShowSessionService
                     SaleEndTime = req.SaleEndTime ?? session.SaleEndTime,
                     Priority = req.Priority,
                     Quota = req.Quota,
-                    Status = PriceStrategyStatus.ENABLED.ToDbString(),
+                    Status = req.Status.ToDbString(),
                     CreateBy = currentOperator,
                     UpdateBy = currentOperator,
                     CreateTime = now,
@@ -325,6 +373,31 @@ public class AdminShowSessionService : IAdminShowSessionService
             .ToListAsync(cancellationToken);
 
         return sessions.Select(ShowSessionService.ToDto);
+    }
+
+    public async Task<IEnumerable<AdminPriceStrategyDto>> GetAdminPricingStrategiesAsync(
+        long sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        var strategies = await _context.PriceStrategy
+            .AsNoTracking()
+            .Where(p => p.SessionId == sessionId)
+            .OrderBy(p => p.SeatSectionId)
+            .ThenBy(p => p.PriceStrategyId)
+            .ToListAsync(cancellationToken);
+
+        return strategies.Select(p => new AdminPriceStrategyDto(
+            p.PriceStrategyId,
+            p.SessionId,
+            p.SeatSectionId,
+            p.StrategyName,
+            p.PriceType.ToEnum<PriceType>(),
+            p.Price,
+            p.SaleStartTime == default ? null : p.SaleStartTime,
+            p.SaleEndTime == default ? null : p.SaleEndTime,
+            p.Priority,
+            p.Quota,
+            p.Status.ToEnum<PriceStrategyStatus>()));
     }
 
     internal static ShowSessionDto ToDto(ShowtimeBackend.Entities.ShowSession.ShowSession s) => new(

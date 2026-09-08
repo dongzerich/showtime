@@ -117,6 +117,53 @@ public sealed class ShowSessionAdminControllersTests
     }
 
     [Fact]
+    public async Task GetAdminPricingStrategies_ReturnsAllTiersIncludingDisabledAndWindows()
+    {
+        await using var db = CreateDbContext();
+        var session = SeedShowSession(db, 1, 10);
+        var now = DateTime.UtcNow;
+        db.PriceStrategy.AddRange(
+            new PriceStrategy
+            {
+                SessionId = session.SessionId,
+                SeatSectionId = 1,
+                StrategyName = "早鸟票策略",
+                PriceType = "EARLY_BIRD",
+                Price = 100m,
+                SaleStartTime = now.AddDays(-5),
+                SaleEndTime = now.AddDays(-1),
+                Priority = 0,
+                Status = "ENABLED"
+            },
+            new PriceStrategy
+            {
+                SessionId = session.SessionId,
+                SeatSectionId = 2,
+                StrategyName = "标准票策略",
+                PriceType = "STANDARD",
+                Price = 180m,
+                SaleStartTime = now.AddDays(-1),
+                SaleEndTime = now.AddDays(5),
+                Priority = 1,
+                Status = "DISABLED"
+            }
+        );
+        await db.SaveChangesAsync();
+
+        var controller = CreateAdminController(db);
+        var actionResult = await controller.GetAdminPricingStrategies(session.SessionId, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var apiResponse = Assert.IsType<ApiResponse<IEnumerable<AdminPriceStrategyDto>>>(okResult.Value);
+        Assert.True(apiResponse.Success);
+        var strategies = apiResponse.Data!.ToList();
+        Assert.Equal(2, strategies.Count);
+        var disabled = strategies.Single(s => s.SeatSectionId == 2);
+        Assert.Equal(PriceStrategyStatus.DISABLED, disabled.Status);
+        Assert.Equal(PriceType.STANDARD, disabled.PriceType);
+    }
+
+    [Fact]
     public async Task ConfigurePriceStrategies_WhenSessionNotExists_ReturnsNotFound()
     {
         await using var db = CreateDbContext();
@@ -270,6 +317,112 @@ public sealed class ShowSessionAdminControllersTests
         var apiResponse = Assert.IsType<ApiResponse<object>>(notFoundResult.Value);
         Assert.False(apiResponse.Success);
         Assert.Equal("NOT_FOUND", apiResponse.Code);
+    }
+
+    [Fact]
+    public async Task UpdateSession_WhenValidRequest_UpdatesFieldsAndReturnsOk()
+    {
+        await using var db = CreateDbContext();
+        var session = SeedShowSession(db, 1, 10, initialStatus: "PRESALE");
+        var controller = CreateAdminController(db);
+
+        var newStart = DateTime.UtcNow.AddDays(20);
+        var request = new UpdateShowSessionRequest(
+            StartTime: newStart,
+            EndTime: newStart.AddHours(3),
+            SaleStartTime: newStart.AddDays(-3),
+            SaleEndTime: newStart.AddHours(-1),
+            SeatMapId: 20);
+
+        var actionResult = await controller.UpdateSession(session.SessionId, request, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var apiResponse = Assert.IsType<ApiResponse<ShowSessionDto>>(okResult.Value);
+        Assert.True(apiResponse.Success);
+        Assert.NotNull(apiResponse.Data);
+        Assert.Equal(request.StartTime, apiResponse.Data.StartTime);
+        Assert.Equal(request.SeatMapId, apiResponse.Data.SeatMapId);
+        Assert.Equal(SessionStatus.PRESALE, apiResponse.Data.SessionStatus);
+
+        var updated = await db.ShowSessions.FindAsync(session.SessionId);
+        Assert.NotNull(updated);
+        Assert.Equal(request.EndTime, updated.EndTime);
+        Assert.Equal(request.SeatMapId, updated.SeatMapId);
+    }
+
+    [Fact]
+    public async Task UpdateSession_WhenSessionNotExists_ReturnsNotFound()
+    {
+        await using var db = CreateDbContext();
+        var controller = CreateAdminController(db);
+        var request = CreateValidUpdateRequest(
+            startTime: DateTime.UtcNow.AddDays(10),
+            endTime: DateTime.UtcNow.AddDays(10).AddHours(2));
+
+        var actionResult = await controller.UpdateSession(9999, request, CancellationToken.None);
+
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(actionResult.Result);
+        var apiResponse = Assert.IsType<ApiResponse<ShowSessionDto>>(notFoundResult.Value);
+        Assert.False(apiResponse.Success);
+        Assert.Equal("NOT_FOUND", apiResponse.Code);
+    }
+
+    [Fact]
+    public async Task UpdateSession_WhenEndTimeBeforeStartTime_ReturnsBadRequest()
+    {
+        await using var db = CreateDbContext();
+        var session = SeedShowSession(db, 1, 10);
+        var controller = CreateAdminController(db);
+        var invalid = CreateValidUpdateRequest(
+            startTime: DateTime.UtcNow.AddDays(10),
+            endTime: DateTime.UtcNow.AddDays(10).AddHours(-1));
+
+        var actionResult = await controller.UpdateSession(session.SessionId, invalid, CancellationToken.None);
+
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var apiResponse = Assert.IsType<ApiResponse<ShowSessionDto>>(badRequestResult.Value);
+        Assert.False(apiResponse.Success);
+        Assert.Equal("INVALID_ARGUMENT", apiResponse.Code);
+    }
+
+    [Fact]
+    public async Task UpdateSession_WhenScheduleConflictsWithAnotherSession_ReturnsConflict()
+    {
+        await using var db = CreateDbContext();
+        var baseTime = DateTime.UtcNow.AddDays(5);
+
+        var first = SeedShowSession(db, 1, 100);
+        first.StartTime = baseTime;
+        first.EndTime = baseTime.AddHours(2);
+        await db.SaveChangesAsync();
+
+        db.ShowSessions.Add(new ShowSession
+        {
+            ShowId = 1,
+            SeatMapId = 100,
+            StartTime = baseTime.AddHours(3),
+            EndTime = baseTime.AddHours(5),
+            SaleStartTime = baseTime.AddDays(-1),
+            SaleEndTime = baseTime.AddHours(2),
+            SessionStatus = "UPCOMING"
+        });
+        await db.SaveChangesAsync();
+
+        var controller = CreateAdminController(db);
+        var conflicting = CreateValidUpdateRequest(
+            startTime: baseTime.AddHours(1),
+            endTime: baseTime.AddHours(4),
+            seatMapId: 100);
+
+        var second = await db.ShowSessions
+            .OrderByDescending(s => s.SessionId)
+            .FirstAsync(s => s.SessionId != first.SessionId);
+        var actionResult = await controller.UpdateSession(second.SessionId, conflicting, CancellationToken.None);
+
+        var conflictResult = Assert.IsType<ConflictObjectResult>(actionResult.Result);
+        var apiResponse = Assert.IsType<ApiResponse<ShowSessionDto>>(conflictResult.Value);
+        Assert.False(apiResponse.Success);
+        Assert.Equal("OPERATION_CONFLICT", apiResponse.Code);
     }
 
     [Fact]
@@ -560,6 +713,20 @@ public sealed class ShowSessionAdminControllersTests
         long seatMapId = 10)
     {
         return new CreateShowSessionRequest(
+            StartTime: startTime,
+            EndTime: endTime,
+            SaleStartTime: startTime.AddDays(-5),
+            SaleEndTime: startTime.AddHours(-1),
+            SeatMapId: seatMapId
+        );
+    }
+
+    private static UpdateShowSessionRequest CreateValidUpdateRequest(
+        DateTime startTime,
+        DateTime endTime,
+        long seatMapId = 10)
+    {
+        return new UpdateShowSessionRequest(
             StartTime: startTime,
             EndTime: endTime,
             SaleStartTime: startTime.AddDays(-5),

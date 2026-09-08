@@ -426,7 +426,6 @@
         ]
       }
     },
-
     "/api/auth/register": {
       "post": {
         "tags": [
@@ -2478,7 +2477,217 @@
         ]
       }
     },
+    "/api/admin/sessions/{sessionId}": {
+      "put": {
+        "tags": [
+          "AdminShowSession"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShowSessionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShowSessionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShowSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfShowSessionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/admin/sessions/{sessionId}/pricing-strategies": {
+      "get": {
+        "tags": [
+          "AdminShowSession"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfAdminPriceStrategyDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfAdminPriceStrategyDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfAdminPriceStrategyDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
       "post": {
         "tags": [
           "AdminShowSession"
@@ -3154,6 +3363,26 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -3266,6 +3495,92 @@
         ]
       }
     },
+    "/api/admin/shows/{showId}/audit-status": {
+      "put": {
+        "tags": [
+          "AdminShow"
+        ],
+        "parameters": [
+          {
+            "name": "showId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShowAuditStatusRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShowAuditStatusRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShowAuditStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfObject"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/admin/venues": {
       "get": {
         "tags": [
@@ -3295,11 +3610,12 @@
         },
         "security": [
           {
-            "Bearer": []
+            "Bearer": [ ]
           }
         ]
       }
-    },    "/api/sessions/{sessionId}/seat-locks": {
+    },
+    "/api/sessions/{sessionId}/seat-locks": {
       "post": {
         "tags": [
           "Seat Locks"
@@ -10045,6 +10361,96 @@
           }
         }
       },
+      "AdminPriceStrategyDto": {
+        "required": [
+          "priceStrategyId",
+          "sessionId",
+          "seatSectionId",
+          "strategyName",
+          "priceType",
+          "price",
+          "saleStartTime",
+          "saleEndTime",
+          "priority",
+          "quota",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "priceStrategyId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "sessionId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "seatSectionId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "strategyName": {
+            "type": "string"
+          },
+          "priceType": {
+            "$ref": "#/components/schemas/PriceType"
+          },
+          "price": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "saleStartTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "saleEndTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "priority": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quota": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PriceStrategyStatus"
+          }
+        }
+      },
       "AdminUserResponse": {
         "required": [
           "userId",
@@ -10344,6 +10750,38 @@
           }
         }
       },
+      "ApiResponseOfIEnumerableOfAdminPriceStrategyDto": {
+        "required": [
+          "success",
+          "data",
+          "code",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AdminPriceStrategyDto"
+            }
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "ApiResponseOfIEnumerableOfCategoryResponse": {
         "required": [
           "success",
@@ -10503,7 +10941,8 @@
             "type": "string"
           }
         }
-      },      "ApiResponseOfIReadOnlyListOfPaymentResponse": {
+      },
+      "ApiResponseOfIReadOnlyListOfPaymentResponse": {
         "required": [
           "success",
           "data",
@@ -12295,6 +12734,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PriceStrategyStatus"
           }
         }
       },
@@ -16754,6 +17196,17 @@
           }
         }
       },
+      "UpdateShowAuditStatusRequest": {
+        "required": [
+          "auditStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "auditStatus": {
+            "$ref": "#/components/schemas/ShowAuditStatus"
+          }
+        }
+      },
       "UpdateShowRequest": {
         "required": [
           "showName",
@@ -16799,6 +17252,42 @@
           },
           "status": {
             "$ref": "#/components/schemas/ShowStatus"
+          }
+        }
+      },
+      "UpdateShowSessionRequest": {
+        "required": [
+          "startTime",
+          "endTime",
+          "saleStartTime",
+          "saleEndTime",
+          "seatMapId"
+        ],
+        "type": "object",
+        "properties": {
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "saleStartTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "saleEndTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "seatMapId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -16975,7 +17464,6 @@
           }
         }
       },
-
       "VenueResponse": {
         "required": [
           "venueId",
@@ -17067,7 +17555,8 @@
     },
     {
       "name": "Seat Zone Administration - Venues"
-    },    {
+    },
+    {
       "name": "Seat Locks"
     },
     {
@@ -17082,7 +17571,6 @@
     {
       "name": "Seat Zone Administration - Seat Sections"
     },
-
     {
       "name": "Sessions"
     },

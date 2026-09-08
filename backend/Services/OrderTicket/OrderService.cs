@@ -234,11 +234,11 @@ public sealed class OrderService(
             .AsNoTracking()
             .Where(item => seatIds.Contains(item.SeatId))
             .ToDictionaryAsync(item => item.SeatId, cancellationToken);
-        var strategyIds = request.Items.Select(item => item.PriceStrategyId).Distinct().ToArray();
         var strategies = await dbContext.Set<PriceStrategy>()
             .AsNoTracking()
-            .Where(item => strategyIds.Contains(item.PriceStrategyId))
-            .ToDictionaryAsync(item => item.PriceStrategyId, cancellationToken);
+            .Where(item => item.SessionId == request.SessionId && item.Status == "ENABLED")
+            .ToListAsync(cancellationToken);
+        var strategyById = strategies.ToDictionary(item => item.PriceStrategyId);
 
         var realNameIds = request.Items
             .Where(item => item.RealNameId.HasValue)
@@ -284,8 +284,8 @@ public sealed class OrderService(
                     $"Seat {requestedItem.SeatId} is unavailable.");
             }
 
-            // 再校验价格策略有效性
-            if (!strategies.TryGetValue(requestedItem.PriceStrategyId, out var strategy) ||
+            // 再校验价格策略有效性（仅校验属于该座位所在票区且启用，成交价以锁定时生效档为准）
+            if (!strategyById.TryGetValue(requestedItem.PriceStrategyId, out var strategy) ||
                 strategy.SessionId != request.SessionId ||
                 strategy.SeatSectionId != seat.SeatSectionId ||
                 strategy.Status != "ENABLED")
@@ -300,17 +300,26 @@ public sealed class OrderService(
                 ? seatLock.CreateTime
                 : now;
 
+            // 方案 A：按锁定时点选择该票区的“当前生效票档”，不信任前端传入档位的价格
+            var effective = PricingTierSelector.SelectEffective(strategies, seat.SeatSectionId, lockTime);
+            if (effective is null)
+            {
+                return Invalid(
+                    "ORDER_NO_EFFECTIVE_PRICE_TIER",
+                    $"Seat {requestedItem.SeatId} region has no active price tier at lock time.");
+            }
+
             decimal realtimeUnitPrice = PricingChange.CalculateRealtimePrice(
-                strategy.Price,
+                effective.Price,
                 session.StartTime,
                 lockTime,
-                strategy.SeatSectionId,
+                effective.SeatSectionId,
                 dynamicRules);
 
             orderItems.Add(new OrderItem
             {
                 SeatId = seat.SeatId,
-                PriceStrategyId = strategy.PriceStrategyId,
+                PriceStrategyId = effective.PriceStrategyId,
                 RealNameId = requestedItem.RealNameId,
                 UnitPrice = realtimeUnitPrice,
                 ItemStatus = "NORMAL",
