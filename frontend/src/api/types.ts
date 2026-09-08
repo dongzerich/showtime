@@ -1691,6 +1691,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sessionId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateShowSessionRequest"];
+                    "text/json": components["schemas"]["UpdateShowSessionRequest"];
+                    "application/*+json": components["schemas"]["UpdateShowSessionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "application/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "text/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "application/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "text/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "application/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "text/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "application/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "text/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "application/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "text/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "application/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                        "text/json": components["schemas"]["ApiResponseOfShowSessionDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/sessions/{sessionId}/pricing-strategies": {
         parameters: {
             query?: never;
@@ -7637,6 +7737,18 @@ export interface components {
             durationMinutes: null | number | string;
             posterUrl: null | string;
             status: components["schemas"]["ShowStatus"];
+        };
+        UpdateShowSessionRequest: {
+            /** Format: date-time */
+            startTime: string;
+            /** Format: date-time */
+            endTime: string;
+            /** Format: date-time */
+            saleStartTime: string;
+            /** Format: date-time */
+            saleEndTime: string;
+            /** Format: int64 */
+            seatMapId: number | string;
         };
         UpdateUserRealNameRequest: {
             realName: string;

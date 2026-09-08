@@ -10,9 +10,6 @@ import {
   NotificationOutlined,
   RollbackOutlined,
   SwapOutlined,
-  FileTextOutlined,
-  FileSyncOutlined,
-  ControlOutlined,
   QrcodeOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
@@ -54,29 +51,22 @@ const AdminLayout = () => {
       label: '订单管理',
     },
     {
-      key: '/admin/refund',
+      key: '/admin/refund-group',
       icon: <RollbackOutlined />,
-      label: '退票审核',
+      label: '退票管理',
+      children: [
+        { key: '/admin/refund', label: '退票审核' },
+        { key: '/admin/refund-policy', label: '退票策略' },
+      ],
     },
     {
-      key: '/admin/exchange',
+      key: '/admin/exchange-group',
       icon: <SwapOutlined />,
-      label: '改签审核',
-    },
-    {
-      key: '/admin/refund-policy',
-      icon: <FileTextOutlined />,
-      label: '退票策略',
-    },
-    {
-      key: '/admin/exchange-policy',
-      icon: <FileSyncOutlined />,
-      label: '改签策略',
-    },
-    {
-      key: '/admin/seat-rule',
-      icon: <ControlOutlined />,
-      label: '座位规则',
+      label: '改签管理',
+      children: [
+        { key: '/admin/exchange', label: '改签审核' },
+        { key: '/admin/exchange-policy', label: '改签策略' },
+      ],
     },
     {
       key: '/admin/redeem',
@@ -118,8 +108,14 @@ const AdminLayout = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
+          defaultOpenKeys={['/admin/refund-group', '/admin/exchange-group']}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }) => {
+            // 分组父节点（退票管理/改签管理）只做展开收起，不导航
+            if (key !== '/admin/refund-group' && key !== '/admin/exchange-group') {
+              navigate(key)
+            }
+          }}
         />
       </Sider>
 

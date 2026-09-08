@@ -201,7 +201,6 @@ const Publish = () => {
           form={form}
           layout="vertical"
           initialValues={{
-            categoryId: 1,
             durationMinutes: 120,
           }}
         >

@@ -67,6 +67,40 @@ public class AdminShowSessionController : ControllerBase
     }
 
     /// <summary>
+    /// 编辑/更新场次基础排期信息
+    /// </summary>
+    [HttpPut("sessions/{sessionId:long}")]
+    [ProducesResponseType(typeof(ApiResponse<ShowSessionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ShowSessionDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<ShowSessionDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<ShowSessionDto>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiResponse<ShowSessionDto>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<ShowSessionDto>), StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<ShowSessionDto>>> UpdateSession(
+        [FromRoute] long sessionId,
+        [FromBody] UpdateShowSessionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updated = await _adminService.UpdateSessionAsync(sessionId, request, cancellationToken);
+            return Ok(ApiResponse<ShowSessionDto>.Ok(updated, "场次更新成功"));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse<ShowSessionDto>.Fail("NOT_FOUND", ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<ShowSessionDto>.Fail("INVALID_ARGUMENT", ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ApiResponse<ShowSessionDto>.Fail("OPERATION_CONFLICT", ex.Message));
+        }
+    }
+
+    /// <summary>
     /// 配置或覆盖更新场次基础票价策略
     /// </summary>
     /// <remarks>

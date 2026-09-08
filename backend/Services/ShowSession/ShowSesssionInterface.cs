@@ -38,6 +38,11 @@ public interface IAdminShowSessionService
     Task<ShowSessionDto> CreateSessionAsync(long showId, CreateShowSessionRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 编辑场次基础排期信息
+    /// </summary>
+    Task<ShowSessionDto> UpdateSessionAsync(long sessionId, UpdateShowSessionRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 为场次批量配置区域票价策略
     /// </summary>
     Task ConfigurePriceStrategiesAsync(long sessionId, IEnumerable<CreatePriceStrategyRequest> requests, string operatorName = "admin", CancellationToken cancellationToken = default);

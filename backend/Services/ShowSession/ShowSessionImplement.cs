@@ -145,6 +145,47 @@ public class AdminShowSessionService : IAdminShowSessionService
         return ToDto(sessionEntity);
     }
 
+    public async Task<ShowSessionDto> UpdateSessionAsync(
+        long sessionId,
+        UpdateShowSessionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _context.ShowSessions
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"未找到 ID 为 {sessionId} 的场次");
+        }
+
+        if (request.StartTime >= request.EndTime)
+            throw new ArgumentException("演出结束时间必须晚于开始时间");
+
+        if (request.SaleStartTime >= request.SaleEndTime)
+            throw new ArgumentException("预售结束时间必须晚于预售开始时间");
+
+        bool hasConflict = await _context.ShowSessions.CountAsync(s =>
+            s.SessionId != sessionId &&
+            s.SeatMapId == request.SeatMapId &&
+            s.SessionStatus != SessionStatus.ENDED.ToDbString() &&
+            request.StartTime < s.EndTime && request.EndTime > s.StartTime,
+            cancellationToken) > 0;
+
+        if (hasConflict)
+            throw new InvalidOperationException("该场地在指定时间段内已存在其他场次排期");
+
+        session.StartTime = request.StartTime;
+        session.EndTime = request.EndTime;
+        session.SaleStartTime = request.SaleStartTime;
+        session.SaleEndTime = request.SaleEndTime;
+        session.SeatMapId = request.SeatMapId;
+        session.UpdateTime = DateTime.UtcNow;
+
+        _context.ShowSessions.Update(session);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ToDto(session);
+    }
+
     public async Task ConfigurePriceStrategiesAsync(
         long sessionId,
         IEnumerable<CreatePriceStrategyRequest> requests,

@@ -84,6 +84,16 @@ export const addSession = (showId: number, data: CreateShowSessionRequest) => {
   });
 };
 
+// 编辑场次基础排期信息
+export type UpdateShowSessionRequest = components['schemas']['UpdateShowSessionRequest'];
+
+export const updateSession = (sessionId: number, data: UpdateShowSessionRequest) => {
+  return client.PUT('/api/admin/sessions/{sessionId}', {
+    params: { path: { sessionId } },
+    body: data,
+  });
+};
+
 // 给场次添加定价策略（数组）
 export const addPricingStrategies = (sessionId: number, data: CreatePriceStrategyRequest[]) => {
   return client.POST('/api/admin/sessions/{sessionId}/pricing-strategies', {

@@ -10,17 +10,23 @@ import {
   Form,
   Input,
   InputNumber,
+  DatePicker,
   message,
   Popconfirm,
 } from 'antd'
+import dayjs from 'dayjs'
 import {
   getShowList,
   getShowSessions,
+  addSession,
+  updateSession,
   updateSessionStatus,
   getSeatSections,
+  getSeatMapList,
   configureDynamicPricingRules,
   type ShowDto,
   type ShowSessionDto,
+  type SeatMapResponse,
   type SessionStatus,
   type CreateDynamicPricingRuleRequest,
 } from '../../../api/admin'
@@ -40,6 +46,12 @@ const Session = () => {
   const [loading, setLoading] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
   const [currentSession, setCurrentSession] = useState<ShowSessionDto | null>(null)
+  // 新增/编辑场次
+  const [seatMaps, setSeatMaps] = useState<SeatMapResponse[]>([])
+  const [editorVisible, setEditorVisible] = useState(false)
+  const [editingSession, setEditingSession] = useState<ShowSessionDto | null>(null)
+  const [editorSaving, setEditorSaving] = useState(false)
+  const [editorForm] = Form.useForm()
   // 动态定价配置
   const [pricingVisible, setPricingVisible] = useState(false)
   const [pricingSections, setPricingSections] = useState<{ seatSectionId: number | string; sectionName: string }[]>([])
@@ -59,6 +71,21 @@ const Session = () => {
       }
     }
     loadShows()
+  }, [])
+
+  // 加载座位图（新增/编辑场次选择用）
+  useEffect(() => {
+    const loadSeatMaps = async () => {
+      try {
+        const res = await getSeatMapList({ PageSize: 100 })
+        if (res.data?.data) {
+          setSeatMaps(res.data.data.items || [])
+        }
+      } catch {
+        message.error('加载座位图失败')
+      }
+    }
+    loadSeatMaps()
   }, [])
 
   // 选择演出后加载场次
@@ -100,6 +127,62 @@ const Session = () => {
   const handleViewDetail = (session: ShowSessionDto) => {
     setCurrentSession(session)
     setDetailVisible(true)
+  }
+
+  // ========== 新增 / 编辑场次 ==========
+  const openCreateEditor = () => {
+    if (!selectedShowId) {
+      message.warning('请先选择演出')
+      return
+    }
+    setEditingSession(null)
+    editorForm.resetFields()
+    setEditorVisible(true)
+  }
+
+  const openEditEditor = (session: ShowSessionDto) => {
+    setEditingSession(session)
+    editorForm.setFieldsValue({
+      seatMapId: Number(session.seatMapId),
+      time: [dayjs(session.startTime), dayjs(session.endTime)],
+      saleTime: [dayjs(session.saleStartTime), dayjs(session.saleEndTime)],
+    })
+    setEditorVisible(true)
+  }
+
+  const handleEditorSubmit = async () => {
+    try {
+      const values = await editorForm.validateFields()
+      const payload = {
+        startTime: (values.time[0] as dayjs.Dayjs).toISOString(),
+        endTime: (values.time[1] as dayjs.Dayjs).toISOString(),
+        saleStartTime: (values.saleTime[0] as dayjs.Dayjs).toISOString(),
+        saleEndTime: (values.saleTime[1] as dayjs.Dayjs).toISOString(),
+        seatMapId: Number(values.seatMapId),
+      }
+      setEditorSaving(true)
+      const res = editingSession
+        ? await updateSession(Number(editingSession.sessionId), payload)
+        : selectedShowId
+          ? await addSession(Number(selectedShowId), payload)
+          : null
+      // 用 HTTP 状态判断成败：openapi-fetch 对无 JSON 体的 404 会把 error 置为空字符串，
+      // 若只判 res.error 会漏判并误报“成功”，故这里看 res.response.ok
+      if (!res || !res.response?.ok) {
+        message.error(editingSession ? '编辑失败' : '新增失败')
+        return
+      }
+      message.success(editingSession ? '场次更新成功' : '场次创建成功')
+      setEditorVisible(false)
+      if (selectedShowId) {
+        loadSessions(selectedShowId)
+      }
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存失败')
+    } finally {
+      setEditorSaving(false)
+    }
   }
 
   const openPricing = async (session: ShowSessionDto) => {
@@ -235,6 +318,9 @@ const Session = () => {
       width: 200,
       render: (_: unknown, record: ShowSessionDto) => (
         <Space>
+          <Button type="link" size="small" onClick={() => openEditEditor(record)}>
+            编辑
+          </Button>
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
             详情
           </Button>
@@ -284,6 +370,9 @@ const Session = () => {
               </Select.Option>
             ))}
           </Select>
+          <Button type="primary" onClick={openCreateEditor} disabled={!selectedShowId}>
+            新增场次
+          </Button>
         </Space>
       </div>
 
@@ -295,6 +384,62 @@ const Session = () => {
         pagination={false}
         locale={{ emptyText: selectedShowId ? '暂无场次数据' : '请先选择演出' }}
       />
+
+      <Modal
+        title={editingSession ? `编辑场次（ID: ${editingSession.sessionId}）` : '新增场次'}
+        open={editorVisible}
+        onCancel={() => setEditorVisible(false)}
+        onOk={handleEditorSubmit}
+        confirmLoading={editorSaving}
+        okText="保存"
+        cancelText="取消"
+        width={600}
+      >
+        <Form form={editorForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            label="座位图"
+            name="seatMapId"
+            rules={[{ required: true, message: '请选择座位图' }]}
+            tooltip="选择场馆座位图（同一座位图在同一时段不可重复排期）"
+          >
+            <Select
+              showSearch
+              optionFilterProp="children"
+              placeholder="请选择座位图"
+            >
+              {seatMaps.map(map => (
+                <Select.Option key={map.seatMapId} value={Number(map.seatMapId)}>
+                  {map.venueName} / {map.mapName}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
+            label="演出时间"
+            name="time"
+            rules={[{ required: true, message: '请选择演出开始和结束时间' }]}
+          >
+            <DatePicker.RangePicker
+              showTime
+              style={{ width: '100%' }}
+              placeholder={['演出开始时间', '演出结束时间']}
+              format="YYYY-MM-DD HH:mm"
+            />
+          </Form.Item>
+          <Form.Item
+            label="售票时间"
+            name="saleTime"
+            rules={[{ required: true, message: '请选择售票开始和结束时间' }]}
+          >
+            <DatePicker.RangePicker
+              showTime
+              style={{ width: '100%' }}
+              placeholder={['售票开始时间', '售票结束时间']}
+              format="YYYY-MM-DD HH:mm"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="场次详情"
