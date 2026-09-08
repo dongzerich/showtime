@@ -40,7 +40,7 @@ namespace ShowtimeBackend.TestData
             IReadOnlyCollection<SeatSection> sections,
             IReadOnlyCollection<Seat> seats)
         {
-            if (_context.Set<Order>().Any())
+            if (_context.Set<Order>().Count() > 0)
             {
                 Log("检测到已存在订单数据，跳过交易数据生成。如需重建请先清空订单/票务相关表。");
                 return new SalesStats(0, 0, 0, 0, 0, 0, 0, 0);

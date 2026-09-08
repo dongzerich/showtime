@@ -17,7 +17,7 @@ namespace ShowtimeBackend.TestData
         /// <summary>为演出补充营销内容（公告/广告/促销）</summary>
         private int GenerateMarketingContents(IReadOnlyCollection<Show> shows)
         {
-            if (_context.Set<MarketingContent>().Any())
+            if (_context.Set<MarketingContent>().Count() > 0)
             {
                 return 0;
             }
@@ -83,7 +83,7 @@ namespace ShowtimeBackend.TestData
             IReadOnlyCollection<ShowSession> sessions,
             IReadOnlyCollection<SeatSection> sections)
         {
-            if (_context.Set<DynamicPricingRule>().Any())
+            if (_context.Set<DynamicPricingRule>().Count() > 0)
             {
                 return 0;
             }
@@ -170,7 +170,7 @@ namespace ShowtimeBackend.TestData
             IReadOnlyCollection<SeatMap> seatMaps,
             IReadOnlyCollection<SeatSection> sections)
         {
-            if (_context.Set<SeatRule>().Any())
+            if (_context.Set<SeatRule>().Count() > 0)
             {
                 return 0;
             }
@@ -276,7 +276,7 @@ namespace ShowtimeBackend.TestData
         /// <summary>生成退票策略（全局通用 + 少量按演出定制）</summary>
         private int GenerateRefundPolicies(IReadOnlyCollection<Show> shows)
         {
-            if (_context.Set<RefundPolicy>().Any())
+            if (_context.Set<RefundPolicy>().Count() > 0)
             {
                 return 0;
             }
@@ -332,7 +332,7 @@ namespace ShowtimeBackend.TestData
         /// <summary>生成改签策略（全局通用 + 少量按演出定制）</summary>
         private int GenerateExchangePolicies(IReadOnlyCollection<Show> shows)
         {
-            if (_context.Set<ExchangePolicy>().Any())
+            if (_context.Set<ExchangePolicy>().Count() > 0)
             {
                 return 0;
             }

@@ -19,7 +19,7 @@ namespace ShowtimeBackend.TestData
         /// </summary>
         private List<OrgStructure> GenerateOrgStructure()
         {
-            if (_context.Set<OrgStructure>().Any())
+            if (_context.Set<OrgStructure>().Count() > 0)
             {
                 return new List<OrgStructure>();
             }
@@ -191,7 +191,7 @@ namespace ShowtimeBackend.TestData
         /// </summary>
         private int GenerateUserSessions()
         {
-            if (_context.Set<UserSession>().Any())
+            if (_context.Set<UserSession>().Count() > 0)
             {
                 return 0;
             }
@@ -248,7 +248,7 @@ namespace ShowtimeBackend.TestData
         /// </summary>
         private int GenerateUserBlacklist(IReadOnlyCollection<ShowtimeBackend.Entities.ShowSession.Show> shows)
         {
-            if (_context.Set<UserBlacklist>().Any())
+            if (_context.Set<UserBlacklist>().Count() > 0)
             {
                 return 0;
             }
@@ -308,7 +308,7 @@ namespace ShowtimeBackend.TestData
         /// </summary>
         private int GenerateOperationLogs(IReadOnlyCollection<ShowtimeBackend.Entities.ShowSession.Show> shows)
         {
-            if (_context.Set<OperationLog>().Any())
+            if (_context.Set<OperationLog>().Count() > 0)
             {
                 return 0;
             }
