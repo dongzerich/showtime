@@ -29,7 +29,6 @@ namespace ShowtimeBackend.TestData
         private readonly bool _enableOrderSeed;
         private readonly double _endedSessionSoldRatio;
         private readonly double _onSaleSessionSoldRatio;
-        private readonly double _upcomingSessionSoldRatio;
         private readonly double _refundOrderRatio;
         private readonly double _exchangeOrderRatio;
 
@@ -51,7 +50,6 @@ namespace ShowtimeBackend.TestData
             bool enableOrderSeed = true,
             double endedSessionSoldRatio = 0.65,
             double onSaleSessionSoldRatio = 0.18,
-            double upcomingSessionSoldRatio = 0.05,
             double refundOrderRatio = 0.06,
             double exchangeOrderRatio = 0.02)
         {
@@ -65,7 +63,6 @@ namespace ShowtimeBackend.TestData
             _enableOrderSeed = enableOrderSeed;
             _endedSessionSoldRatio = ClampRatio(endedSessionSoldRatio);
             _onSaleSessionSoldRatio = ClampRatio(onSaleSessionSoldRatio);
-            _upcomingSessionSoldRatio = ClampRatio(upcomingSessionSoldRatio);
             _refundOrderRatio = ClampRatio(refundOrderRatio);
             _exchangeOrderRatio = ClampRatio(exchangeOrderRatio);
         }

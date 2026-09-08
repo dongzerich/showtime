@@ -55,7 +55,6 @@ dotnet run -- "User Id=<姓名全拼>;Password=<密码>;Data Source=<host>:1521/
     "EnableOrderSeed": true,
     "EndedSessionSoldRatio": 0.65,
     "OnSaleSessionSoldRatio": 0.18,
-    "UpcomingSessionSoldRatio": 0.05,
     "RefundOrderRatio": 0.06,
     "ExchangeOrderRatio": 0.02
   },
@@ -71,7 +70,6 @@ dotnet run -- "User Id=<姓名全拼>;Password=<密码>;Data Source=<host>:1521/
 | `EnableOrderSeed` | true | 是否生成订单/支付/票务等交易数据 |
 | `EndedSessionSoldRatio` | 0.65 | 已结束场次的售出比例 |
 | `OnSaleSessionSoldRatio` | 0.18 | 在售场次的售出比例（保留足够余座给选座演示） |
-| `UpcomingSessionSoldRatio` | 0.05 | 未开售场次不生成订单（保留完整座位） |
 | `RefundOrderRatio` | 0.06 | 已出票订单中产生退票申请的比例 |
 | `ExchangeOrderRatio` | 0.02 | 已出票订单中产生改签的比例 |
 

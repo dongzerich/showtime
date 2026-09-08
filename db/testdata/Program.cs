@@ -80,7 +80,6 @@ class Program
             bool enableOrderSeed = bool.Parse(genConfig["EnableOrderSeed"] ?? "true");
             double endedSessionSoldRatio = double.Parse(genConfig["EndedSessionSoldRatio"] ?? "0.65");
             double onSaleSessionSoldRatio = double.Parse(genConfig["OnSaleSessionSoldRatio"] ?? "0.18");
-            double upcomingSessionSoldRatio = double.Parse(genConfig["UpcomingSessionSoldRatio"] ?? "0.05");
             double refundOrderRatio = double.Parse(genConfig["RefundOrderRatio"] ?? "0.06");
             double exchangeOrderRatio = double.Parse(genConfig["ExchangeOrderRatio"] ?? "0.02");
 
@@ -110,7 +109,6 @@ class Program
                 enableOrderSeed,
                 endedSessionSoldRatio,
                 onSaleSessionSoldRatio,
-                upcomingSessionSoldRatio,
                 refundOrderRatio,
                 exchangeOrderRatio
             );
