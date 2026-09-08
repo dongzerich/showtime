@@ -7,6 +7,11 @@
 
 ## 变更时间线
 
+### 2026-09-08 · 管理端用户管理
+
+- 新增管理端用户接口（无 Schema 变更）：`GET /api/admin/users`（分页/关键字/状态查询）、`POST /api/admin/users`（创建，默认绑定 USER 角色）、`DELETE /api/admin/users/{userId}`（删除，仅无订单/票务/会话/实名等关联数据时可物理删除，否则 409）。
+- 身份要求：Admin 角色。
+
 ### 2026-07-26 · 订单模块调整
 
 脚本：`db/migrations/20260726__order_ticket_change.sql`
@@ -176,6 +181,8 @@
 | GET/POST | `/api/admin/exchange-policies`、`PUT/{id}`、`PATCH/{id}/status` | 改签策略 |
 | POST | `/api/admin/tickets/redeem` | 电子票核销 |
 | GET/POST/PUT/DELETE | `/api/admin/marketing-contents` | 营销内容 |
+| GET/POST | `/api/admin/users` | 用户分页查询/创建 |
+| DELETE | `/api/admin/users/{userId}` | 删除用户（无关联数据） |
 
 ---
 
