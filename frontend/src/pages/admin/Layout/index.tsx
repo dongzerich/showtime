@@ -100,9 +100,9 @@ const AdminLayout = () => {
   ]
 
   return (
-    <Layout style={{ minHeight: '100vh', minWidth: 1280 }}>
-      {/* 左侧深色侧边栏：吸顶并占满整屏，内容下滑时始终覆盖全页 */}
-      <Sider width={200} theme="dark" style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'auto' }}>
+    <Layout style={{ height: '100vh', minWidth: 1280 }}>
+      {/* 左侧深色侧边栏：随外层布局占满整屏，滚动只发生在右侧内容区 */}
+      <Sider width={200} theme="dark" style={{ height: '100%', overflow: 'auto' }}>
         <div style={{
           height: 64,
           color: 'white',
@@ -122,8 +122,8 @@ const AdminLayout = () => {
         />
       </Sider>
 
-      {/* 右侧白色内容区 */}
-      <Layout>
+      {/* 右侧白色内容区：页面级滚动收敛到内容区，避免撑大整页导致侧边栏留白 */}
+      <Layout style={{ overflow: 'auto' }}>
         <Content style={{ margin: 24, padding: 24, background: 'white', borderRadius: 4 }}>
           <Outlet /> {/* 子页面内容显示在这里 */}
         </Content>
