@@ -744,7 +744,13 @@ export async function mockApi(page: Page, seed?: (db: MockDb) => void): Promise<
       }));
     }
 
-    // ---------- 管理端：演出 / 场次 / 座位图 ----------
+    // ---------- 管理端：场馆 / 演出 / 场次 / 座位图 ----------
+    if (method === 'GET' && path === 'admin/venues') {
+      return fulfill(200, ok([
+        { venueId: 1, venueName: '主会场', address: null, contactPhone: null, status: 'ENABLED', remark: null },
+      ]));
+    }
+
     if (method === 'GET' && path === 'admin/shows') {
       return fulfill(200, ok({
         items: MOCK_SHOWS.map((s) => ({
