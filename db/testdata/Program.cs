@@ -76,11 +76,27 @@ class Program
             int maxSessions = int.Parse(genConfig["MaxSessionsPerShow"] ?? "5");
             int seatsPerSession = int.Parse(genConfig["SeatsPerSession"] ?? "200");
             bool enableDetailedLog = bool.Parse(genConfig["EnableDetailedLog"] ?? "true");
+            int extraUserCount = int.Parse(genConfig["ExtraUserCount"] ?? "60");
+            bool enableOrderSeed = bool.Parse(genConfig["EnableOrderSeed"] ?? "true");
+            double endedSessionSoldRatio = double.Parse(genConfig["EndedSessionSoldRatio"] ?? "0.65");
+            double onSaleSessionSoldRatio = double.Parse(genConfig["OnSaleSessionSoldRatio"] ?? "0.18");
+            double upcomingSessionSoldRatio = double.Parse(genConfig["UpcomingSessionSoldRatio"] ?? "0.05");
+            double refundOrderRatio = double.Parse(genConfig["RefundOrderRatio"] ?? "0.06");
+            double exchangeOrderRatio = double.Parse(genConfig["ExchangeOrderRatio"] ?? "0.02");
 
             Console.WriteLine("Configuration:");
             Console.WriteLine($"  Shows:              {showCount}");
             Console.WriteLine($"  Sessions per show:  {minSessions} ~ {maxSessions}");
             Console.WriteLine($"  Seats per session:  {seatsPerSession}");
+            Console.WriteLine($"  Extra buyer users:  {extraUserCount}");
+            Console.WriteLine($"  Order seeding:      {enableOrderSeed}");
+            if (enableOrderSeed)
+            {
+                Console.WriteLine($"    Ended sold ratio:  {endedSessionSoldRatio:P0}");
+                Console.WriteLine($"    On-sale sold ratio:{onSaleSessionSoldRatio:P0}");
+                Console.WriteLine($"    Refund ratio:      {refundOrderRatio:P0}");
+                Console.WriteLine($"    Exchange ratio:    {exchangeOrderRatio:P0}");
+            }
             Console.WriteLine();
 
             var generator = new TestDataGenerator(
@@ -89,7 +105,14 @@ class Program
                 minSessions,
                 maxSessions,
                 seatsPerSession,
-                enableDetailedLog
+                enableDetailedLog,
+                extraUserCount,
+                enableOrderSeed,
+                endedSessionSoldRatio,
+                onSaleSessionSoldRatio,
+                upcomingSessionSoldRatio,
+                refundOrderRatio,
+                exchangeOrderRatio
             );
 
             generator.GenerateAllData();
