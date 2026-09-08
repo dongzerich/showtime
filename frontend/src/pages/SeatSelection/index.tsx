@@ -15,6 +15,10 @@ const SEAT_STATUS_MAP: Record<string, { label: string; className: string }> = {
   UNAVAILABLE: { label: '不可用', className: 'unavailable' },
 };
 
+// 按座位图坐标渲染的常量：座位块尺寸与顶部舞台高度
+const SEAT_SIZE = 30;
+const STAGE_HEIGHT = 64;
+
 // 场次信息
 interface SessionInfo {
   sessionId: number;
@@ -434,84 +438,88 @@ const SeatSelection = () => {
     );
   };
 
-  // ========== 渲染座位矩阵（按票区） ==========
+  // ========== 渲染座位图（按管理端绘制的 X/Y 坐标布局） ==========
   const renderSeats = () => {
     if (!seatMap?.seatMap) return null;
 
-    const sections = seatMap.seatMap.sections || [];
+    const map = seatMap.seatMap;
+    const sections = map.sections || [];
+    const mapSeats = sections.flatMap((section) => section.seats || []);
+    if (mapSeats.length === 0) return null;
+
+    const coordOf = (seat: SessionSeatMapSeatDto) => ({
+      x: Number(seat.xCoord) || 0,
+      y: Number(seat.yCoord) || 0,
+    });
+    const xs = mapSeats.map((s) => coordOf(s).x);
+    const ys = mapSeats.map((s) => coordOf(s).y);
+    const maxX = Math.max(...xs, 0);
+    const maxY = Math.max(...ys, 0);
+    // 优先按座位图宽高铺画布；缺失时退化为座位坐标边界
+    const canvasWidth = Math.max(Number(map.mapWidth) || 0, Math.ceil(maxX + SEAT_SIZE + 60), 640);
+    const canvasHeight = Math.max(Number(map.mapHeight) || 0, Math.ceil(maxY + SEAT_SIZE + 60), 320);
 
     return (
-      <div className="seat-grid-wrapper">
-        {sections.map((section) => {
-          const sectionSeats = section.seats || [];
-          if (sectionSeats.length === 0) return null;
-
-          const rows: Record<string, SessionSeatMapSeatDto[]> = {};
-          sectionSeats.forEach((seat) => {
-            const key = seat.rowCode;
-            if (!rows[key]) rows[key] = [];
-            rows[key].push(seat);
-          });
-
-          Object.keys(rows).forEach((key) => {
-            rows[key].sort((a, b) => a.colIndex - b.colIndex);
-          });
-
-          const rowKeys = Object.keys(rows).sort();
-
-          return (
-            <div key={section.seatSectionId} className="seat-section">
+      <div className="seat-map-canvas-wrapper">
+        <div
+          className="seat-map-canvas"
+          style={{ width: canvasWidth, height: canvasHeight }}
+        >
+          <div className="seat-map-stage">舞 台</div>
+          {sections.map((section) => {
+            const sectionSeats = section.seats || [];
+            if (sectionSeats.length === 0) return null;
+            const minX = Math.min(...sectionSeats.map((s) => coordOf(s).x));
+            const minY = Math.min(...sectionSeats.map((s) => coordOf(s).y));
+            return (
               <div
-                className="section-header"
+                key={`label-${section.seatSectionId}`}
+                className="seat-map-section-label"
                 style={{
-                  backgroundColor: section.sectionColor || '#e8e8e8',
-                  color: '#fff',
-                  padding: '4px 12px',
-                  borderRadius: '4px',
-                  marginBottom: '8px',
-                  fontWeight: 'bold',
-                  fontSize: '14px',
+                  left: Math.max(4, minX),
+                  top: Math.max(STAGE_HEIGHT + 8, minY - 22),
+                  borderColor: section.sectionColor || '#d9d9d9',
+                  color: section.sectionColor || '#666',
                 }}
               >
                 {section.sectionName}
               </div>
-              <div className="seat-grid">
-                {rowKeys.map((rowKey) => (
-                  <div key={rowKey} className="seat-row">
-                    <span className="row-label">{rowKey}</span>
-                    {rows[rowKey].map((seat) => {
-                      const isSelected = selectedSeats.includes(seat.seatId);
-                      const statusKey = (seat.availabilityStatus || seat.seatStatus || '').toUpperCase();
-                      let statusInfo;
-                      if (seat.isSellable && statusKey === 'AVAILABLE') {
-                        statusInfo = SEAT_STATUS_MAP['AVAILABLE'];
-                      } else if (!seat.isSellable) {
-                        statusInfo = { label: '不可售', className: 'unavailable' };
-                      } else {
-                        statusInfo = SEAT_STATUS_MAP[statusKey] || { label: '未知', className: 'unknown' };
-                      }
-                      const price = getSeatPrice(seat);
+            );
+          })}
+          {mapSeats.map((seat) => {
+            const isSelected = selectedSeats.includes(seat.seatId);
+            const statusKey = (seat.availabilityStatus || seat.seatStatus || '').toUpperCase();
+            let statusInfo;
+            if (seat.isSellable && statusKey === 'AVAILABLE') {
+              statusInfo = SEAT_STATUS_MAP['AVAILABLE'];
+            } else if (!seat.isSellable) {
+              statusInfo = { label: '不可售', className: 'unavailable' };
+            } else {
+              statusInfo = SEAT_STATUS_MAP[statusKey] || { label: '未知', className: 'unknown' };
+            }
+            const price = getSeatPrice(seat);
+            const seatLabel = seat.seatNo || `${seat.rowCode}${seat.colIndex}`;
+            const coord = coordOf(seat);
 
-                      const seatLabel = seat.seatNo || `${seat.rowCode}${seat.colIndex}`;
-
-                      return (
-                        <div
-                          key={seat.seatId}
-                          className={`seat ${statusInfo.className} ${isSelected ? 'selected' : ''}`}
-                          onClick={() => handleSeatClick(seat)}
-                          title={`${seatLabel} - ${statusInfo.label}${price > 0 ? ` ¥${price}` : ''}`}
-                        >
-                          <span className="seat-number">{seatLabel}</span>
-                          {price > 0 && <span className="seat-price">{price}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
+            return (
+              <div
+                key={seat.seatId}
+                className={`seat ${statusInfo.className} ${isSelected ? 'selected' : ''}`}
+                onClick={() => handleSeatClick(seat)}
+                title={`${seat.sectionName || ''} ${seatLabel} - ${statusInfo.label}${price > 0 ? ` ¥${price}` : ''}`}
+                style={{
+                  left: coord.x,
+                  top: coord.y,
+                  width: SEAT_SIZE,
+                  height: SEAT_SIZE,
+                  lineHeight: `${SEAT_SIZE - 4}px`,
+                }}
+              >
+                <span className="seat-number">{seatLabel}</span>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   };
