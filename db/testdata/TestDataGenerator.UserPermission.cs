@@ -123,7 +123,7 @@ namespace ShowtimeBackend.TestData
                 var user = new SysUser
                 {
                     UserName = userName,
-                    Nickname = _faker.Name.FullName(),
+                    Nickname = GenerateNickname(),
                     Phone = phone,
                     Email = email,
                     UserType = typePool[_random.Next(typePool.Length)],
@@ -169,6 +169,31 @@ namespace ShowtimeBackend.TestData
             _context.SaveChanges();
             Log($"  Generated {created.Count} extra buyer accounts (idempotent by username)");
             return created;
+        }
+
+        private static readonly string[] NicknamePool =
+        {
+            "风一样的男子", "云淡风轻", "爱喝奶茶的喵", "山间清风", "追风少年",
+            "且听风吟", "星河滚烫", "人间理想", "熬夜冠军", "干饭第一名",
+            "今天也要加油鸭", "一只咸鱼", "小饼干", "想不出昵称", "用户不存在",
+            "晚风吻尽", "偷得浮生半日闲", "恰好心动", "雾里看花", "半盏流年",
+            "拾光者", "柠檬不酸", "小熊软糖", "旺旺仙贝", "麦辣鸡腿堡",
+            "空调房里吃西瓜", "碎觉觉", "摸鱼大师", "快乐星球球长", "大侠饶命",
+            "有点懒", "每天都要早睡", "爱看演出的路人", "剧场的猫", "追光的人",
+            "幕间休息", "谢幕之后", "第二排中间", "票根收藏家", "开场前五分钟",
+            "喝奶茶不长胖", "明天再减肥", "睡不醒的冬三月", "路过的风", "月亮不睡我不睡",
+            "在逃观众", "散场不散伙", "长夜有星光"
+        };
+
+        /// <summary>生成常见中文网名风格昵称（部分附加随机数字后缀，减少重复）</summary>
+        private string GenerateNickname()
+        {
+            var nickname = NicknamePool[_random.Next(NicknamePool.Length)];
+            if (_random.Next(0, 4) == 0)
+            {
+                nickname += _random.Next(10, 999);
+            }
+            return nickname;
         }
 
         /// <summary>生成不重复的 11 位手机号（1 开头，剩余由随机决定）</summary>
