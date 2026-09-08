@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button, message, Typography, Spin, Radio } from 'antd';
 import { sessionAPI, showSessionAPI, orderAPI, seatLockAPI } from '@/api/requests';
 import type { SessionSeatMapDto, SessionSeatMapSeatDto, PricingStrategyDto } from '@/types/api';
+import { computeSeatMapLayout, SEAT_SIZE } from './seatMapLayout';
 import './SeatSelection.css';
 
 const { Title, Text } = Typography;
@@ -23,10 +24,6 @@ const PRICE_TYPE_TEXT: Record<string, string> = {
   VIP: 'VIP票',
   MEMBER: '会员票',
 };
-
-// 按座位图坐标渲染的常量：座位块尺寸与顶部舞台高度
-const SEAT_SIZE = 30;
-const STAGE_HEIGHT = 64;
 
 // 场次信息
 interface SessionInfo {
@@ -456,54 +453,57 @@ const SeatSelection = () => {
   };
 
   // ========== 渲染座位图（按管理端绘制的 X/Y 坐标布局） ==========
+  // 舞台与票区标注是前端叠加在坐标画布上的装饰层，管理端坐标不会为它们预留位置。
+  // 统一走 seatMapLayout 排版：整体下移避开舞台，并把票区标注放进区块上方空隙。
   const renderSeats = () => {
     if (!seatMap?.seatMap) return null;
 
     const map = seatMap.seatMap;
-    const sections = map.sections || [];
-    const mapSeats = sections.flatMap((section) => section.seats || []);
-    if (mapSeats.length === 0) return null;
-
-    const coordOf = (seat: SessionSeatMapSeatDto) => ({
-      x: Number(seat.xCoord) || 0,
-      y: Number(seat.yCoord) || 0,
-    });
-    const xs = mapSeats.map((s) => coordOf(s).x);
-    const ys = mapSeats.map((s) => coordOf(s).y);
-    const maxX = Math.max(...xs, 0);
-    const maxY = Math.max(...ys, 0);
-    // 优先按座位图宽高铺画布；缺失时退化为座位坐标边界
-    const canvasWidth = Math.max(Number(map.mapWidth) || 0, Math.ceil(maxX + SEAT_SIZE + 60), 640);
-    const canvasHeight = Math.max(Number(map.mapHeight) || 0, Math.ceil(maxY + SEAT_SIZE + 60), 320);
+    const layout = computeSeatMapLayout(
+      map.sections || [],
+      map.mapWidth,
+      map.mapHeight,
+    );
+    if (!layout) return null;
 
     return (
       <div className="seat-map-canvas-wrapper">
         <div
           className="seat-map-canvas"
-          style={{ width: canvasWidth, height: canvasHeight }}
+          style={{ width: layout.canvasWidth, height: layout.canvasHeight }}
         >
           <div className="seat-map-stage">舞 台</div>
-          {sections.map((section) => {
-            const sectionSeats = section.seats || [];
-            if (sectionSeats.length === 0) return null;
-            const minX = Math.min(...sectionSeats.map((s) => coordOf(s).x));
-            const minY = Math.min(...sectionSeats.map((s) => coordOf(s).y));
-            return (
-              <div
-                key={`label-${section.seatSectionId}`}
-                className="seat-map-section-label"
-                style={{
-                  left: Math.max(4, minX),
-                  top: Math.max(STAGE_HEIGHT + 8, minY - 22),
-                  borderColor: section.sectionColor || '#d9d9d9',
-                  color: section.sectionColor || '#666',
-                }}
-              >
-                {section.sectionName}
-              </div>
-            );
-          })}
-          {mapSeats.map((seat) => {
+          {layout.boundaries.map((boundary) => (
+            <div
+              key={`boundary-${boundary.seatSectionId}`}
+              className="seat-map-section-boundary"
+              style={{
+                left: boundary.x,
+                top: boundary.y,
+                width: boundary.w,
+                height: boundary.h,
+                borderColor: boundary.color || '#d9d9d9',
+                background: boundary.color
+                  ? `color-mix(in srgb, ${boundary.color} 7%, transparent)`
+                  : undefined,
+              }}
+            />
+          ))}
+          {layout.labels.map((label) => (
+            <div
+              key={`label-${label.seatSectionId}`}
+              className="seat-map-section-label"
+              style={{
+                left: label.x,
+                top: label.y,
+                borderColor: label.color || '#d9d9d9',
+                color: label.color || '#666',
+              }}
+            >
+              {label.text}
+            </div>
+          ))}
+          {layout.seats.map(({ seat, x, y }) => {
             const isSelected = selectedSeats.includes(seat.seatId);
             const statusKey = (seat.availabilityStatus || seat.seatStatus || '').toUpperCase();
             let statusInfo;
@@ -517,7 +517,6 @@ const SeatSelection = () => {
             const price = getSeatPrice(seat);
             const tierLabel = getSeatTierLabel(seat);
             const seatLabel = seat.seatNo || `${seat.rowCode}${seat.colIndex}`;
-            const coord = coordOf(seat);
 
             return (
               <div
@@ -526,8 +525,8 @@ const SeatSelection = () => {
                 onClick={() => handleSeatClick(seat)}
                 title={`${seat.sectionName || ''} ${seatLabel} - ${statusInfo.label}${price > 0 ? `（${tierLabel || '当前档'} ¥${price}）` : ''}`}
                 style={{
-                  left: coord.x,
-                  top: coord.y,
+                  left: x,
+                  top: y,
                   width: SEAT_SIZE,
                   height: SEAT_SIZE,
                   lineHeight: `${SEAT_SIZE - 4}px`,

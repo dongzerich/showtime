@@ -203,6 +203,57 @@ test.describe.serial('Showtime 完整业务E2E测试集', () => {
     await expect(page.locator('.ant-tag:has-text("待支付")').first()).toBeVisible({ timeout: 15000 });
   });
 
+  // 回归守卫：座位图标不能压住顶部“舞台”，票区标注也不能被座位盖住（旧版会重叠）
+  test('选座页：座位不与舞台/票区标注重叠', async ({ page }) => {
+    test.setTimeout(60000);
+    const testUser = generateTestUser();
+
+    await registerUser(page, testUser);
+    await loginUser(page, testUser);
+
+    await gotoSeatSelection(page);
+    await expect(page.locator('.seat.available').first()).toBeVisible({ timeout: 15000 });
+
+    const result = await page.evaluate(() => {
+      const rect = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+      };
+      // 留 1px 容差，避免子像素取整造成的误报
+      const hit = (a: { l: number; t: number; r: number; b: number }, b: { l: number; t: number; r: number; b: number }) =>
+        a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
+
+      const stage = rect(document.querySelector('.seat-map-stage') as Element);
+      const seats = Array.from(document.querySelectorAll('.seat')).map(rect);
+      const labels = Array.from(document.querySelectorAll('.seat-map-section-label')).map(rect);
+      const boundaries = Array.from(document.querySelectorAll('.seat-map-section-boundary')).map(rect);
+      return {
+        seatCount: seats.length,
+        labelCount: labels.length,
+        boundaryCount: boundaries.length,
+        stageHits: seats.filter((s) => hit(s, stage)).length,
+        labelHits: labels.map((lb) => seats.filter((s) => hit(s, lb)).length),
+        // 单票区 mock：边界框应完整包住本区座位
+        boundaryContainsSeats:
+          boundaries.length === 1 &&
+          seats.every(
+            (s) =>
+              s.l >= boundaries[0].l &&
+              s.t >= boundaries[0].t &&
+              s.r <= boundaries[0].r &&
+              s.b <= boundaries[0].b,
+          ),
+      };
+    });
+
+    expect(result.seatCount).toBeGreaterThan(0);
+    expect(result.labelCount).toBeGreaterThan(0);
+    expect(result.boundaryCount).toBe(result.labelCount);
+    expect(result.boundaryContainsSeats).toBe(true);
+    expect(result.stageHits).toBe(0);
+    expect(result.labelHits.every((n) => n === 0)).toBe(true);
+  });
+
   // ============================================================
   // 7️⃣ 完整购票流程（强断言：支付链路每一步必须真实发生）
   // ============================================================

@@ -67,16 +67,30 @@
 
 .seat-map-section-label {
   position: absolute;
+  height: 20px;
+  line-height: 20px;
   font-size: 13px;
   font-weight: 600;
   padding-left: 6px;
+  padding-right: 6px;
   border-left: 3px solid;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.96);
   border-radius: 2px;
-  line-height: 1.4;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  /* 标注不允许被座位盖住（旧版 z-index 低于座位，A区/B区 常被座位挡住） */
+  z-index: 4;
+}
+
+/* ========== 票区彩色边界框 ========== */
+.seat-map-section-boundary {
+  position: absolute;
+  border: 2px solid #d9d9d9;
+  border-radius: 12px;
+  pointer-events: none;
+  /* 位于画布背景之上、座位图标之下，仅作区域提示，不遮挡座位 */
+  z-index: 1;
 }
 
 /* ========== 单个座位（绝对定位于画布坐标） ========== */

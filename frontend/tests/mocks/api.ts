@@ -120,7 +120,8 @@ function buildSeatMap(sessionId: number) {
           rowIndex: ri,
           colIndex: ci,
           xCoord: 60 + ci * 40,
-          yCoord: 80 + ri * 40,
+          // 第一排从 y=50 开始，用于回归验证：若不避让舞台/标注带，前排会与顶部装饰层重合
+          yCoord: 50 + ri * 40,
           seatType: 'STANDARD',
           seatStatus: 'AVAILABLE',
           isAisleSide: ci === 3 || ci === 7,
