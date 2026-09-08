@@ -2141,6 +2141,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/venues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfIEnumerableOfVenueResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfIEnumerableOfVenueResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfIEnumerableOfVenueResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions/{sessionId}/seat-locks": {
         parameters: {
             query?: never;
@@ -6202,6 +6239,12 @@ export interface components {
             code: null | string;
             message: string;
         };
+        ApiResponseOfIEnumerableOfVenueResponse: {
+            success: boolean;
+            data: null | components["schemas"]["VenueResponse"][];
+            code: null | string;
+            message: string;
+        };
         ApiResponseOfIReadOnlyListOfPaymentResponse: {
             success: boolean;
             data: null | components["schemas"]["PaymentResponse"][];
@@ -7635,6 +7678,15 @@ export interface components {
             riskFlag: boolean;
             status: string;
             isCurrent: boolean;
+        };
+        VenueResponse: {
+            /** Format: int64 */
+            venueId: number | string;
+            venueName: string;
+            address: null | string;
+            contactPhone: null | string;
+            status: string;
+            remark: null | string;
         };
     };
     responses: never;

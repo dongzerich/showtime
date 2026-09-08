@@ -26,8 +26,8 @@ const Dashboard = () => {
     setLoading(true);
     try {
       const [orderRes, showRes] = await Promise.all([
-        getAdminOrderList({ PageSize: 500 }),
-        getShowList({ PageSize: 100 }),
+        getAdminOrderList({ Page: 1, PageSize: 100 }),
+        getShowList({ PageIndex: 1, PageSize: 100 }),
       ]);
 
       const orders: AdminOrderSummary[] = orderRes.data?.data?.items || [];

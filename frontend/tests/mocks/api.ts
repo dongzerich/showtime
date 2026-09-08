@@ -119,8 +119,8 @@ function buildSeatMap(sessionId: number) {
           seatNo: `${row}${ci + 1}`,
           rowIndex: ri,
           colIndex: ci,
-          xCoord: ci * 10,
-          yCoord: ri * 10,
+          xCoord: 60 + ci * 40,
+          yCoord: 80 + ri * 40,
           seatType: 'STANDARD',
           seatStatus: 'AVAILABLE',
           isAisleSide: ci === 3 || ci === 7,
@@ -146,8 +146,8 @@ function buildSeatMap(sessionId: number) {
       mapName: '主会场座位图',
       mapVersion: 'v1',
       isDefault: true,
-      mapWidth: 80,
-      mapHeight: 50,
+      mapWidth: 420,
+      mapHeight: 300,
       mapStatus: 'ACTIVE',
       sections,
     },
@@ -744,7 +744,13 @@ export async function mockApi(page: Page, seed?: (db: MockDb) => void): Promise<
       }));
     }
 
-    // ---------- 管理端：演出 / 场次 / 座位图 ----------
+    // ---------- 管理端：场馆 / 演出 / 场次 / 座位图 ----------
+    if (method === 'GET' && path === 'admin/venues') {
+      return fulfill(200, ok([
+        { venueId: 1, venueName: '主会场', address: null, contactPhone: null, status: 'ENABLED', remark: null },
+      ]));
+    }
+
     if (method === 'GET' && path === 'admin/shows') {
       return fulfill(200, ok({
         items: MOCK_SHOWS.map((s) => ({
