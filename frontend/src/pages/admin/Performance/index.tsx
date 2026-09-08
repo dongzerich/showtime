@@ -24,6 +24,7 @@ import {
   getShowList,
   createShow,
   updateShow,
+  updateShowAuditStatus,
   deleteShow,
   getCategories,
   getRefundPolicyList,
@@ -47,6 +48,12 @@ const statusMap: Record<ShowStatus, { text: string; color: string }> = {
   DRAFT: { text: '草稿', color: 'default' },
   PUBLISHED: { text: '已发布', color: 'success' },
   UNPUBLISHED: { text: '已下架', color: 'warning' },
+}
+
+const auditStatusMap: Record<string, { text: string; color: string }> = {
+  PENDING: { text: '待审核', color: 'processing' },
+  APPROVED: { text: '已通过', color: 'success' },
+  REJECTED: { text: '未通过', color: 'error' },
 }
 
 const policyStatusMap: Record<number, { text: string; color: string }> = {
@@ -219,6 +226,43 @@ const Performance = () => {
     }
   }
 
+  // ========== 演出状态维护：发布 / 下架 ==========
+  const changeShowStatus = async (record: ShowDto, status: ShowStatus) => {
+    try {
+      const res = await updateShow(Number(record.showId), {
+        showName: record.showName,
+        categoryId: Number(record.categoryId),
+        status,
+        description: record.description,
+        durationMinutes: record.durationMinutes != null ? Number(record.durationMinutes) : null,
+        posterUrl: record.posterUrl,
+      })
+      if (!res.response?.ok) {
+        message.error(status === 'PUBLISHED' ? '发布失败，演出需先通过审核' : '下架失败')
+        return
+      }
+      message.success(status === 'PUBLISHED' ? '演出已发布' : '演出已下架')
+      loadData(pagination.current, pagination.pageSize)
+    } catch {
+      message.error('操作失败')
+    }
+  }
+
+  // ========== 审核状态维护：通过 / 驳回 ==========
+  const changeAuditStatus = async (record: ShowDto, auditStatus: ShowDto['auditStatus']) => {
+    try {
+      const res = await updateShowAuditStatus(Number(record.showId), { auditStatus })
+      if (!res.response?.ok) {
+        message.error('审核状态更新失败')
+        return
+      }
+      message.success(auditStatus === 'APPROVED' ? '已审核通过' : '已驳回')
+      loadData(pagination.current, pagination.pageSize)
+    } catch {
+      message.error('操作失败')
+    }
+  }
+
   const columns = [
     {
       title: 'ID',
@@ -258,6 +302,16 @@ const Performance = () => {
       },
     },
     {
+      title: '审核状态',
+      dataIndex: 'auditStatus',
+      key: 'auditStatus',
+      width: 100,
+      render: (audit: ShowDto['auditStatus']) => {
+        const s = auditStatusMap[audit]
+        return s ? <Tag color={s.color}>{s.text}</Tag> : audit
+      },
+    },
+    {
       title: '创建时间',
       dataIndex: 'createTime',
       key: 'createTime',
@@ -267,15 +321,58 @@ const Performance = () => {
     {
       title: '操作',
       key: 'action',
-      width: 220,
+      width: 420,
       render: (_: unknown, record: ShowDto) => (
-        <Space>
+        <Space size={0} wrap>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
             详情
           </Button>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>
             编辑
           </Button>
+          {record.auditStatus !== 'APPROVED' && (
+            <Popconfirm
+              title="确认审核通过该演出？"
+              okText="确认"
+              cancelText="取消"
+              onConfirm={() => changeAuditStatus(record, 'APPROVED')}
+            >
+              <Button type="link" size="small">审核通过</Button>
+            </Popconfirm>
+          )}
+          {record.auditStatus !== 'REJECTED' && (
+            <Popconfirm
+              title="驳回后已发布演出会自动下架，确认驳回？"
+              okText="确认"
+              cancelText="取消"
+              onConfirm={() => changeAuditStatus(record, 'REJECTED')}
+            >
+              <Button type="link" size="small" danger>驳回</Button>
+            </Popconfirm>
+          )}
+          {record.status !== 'PUBLISHED' && record.auditStatus === 'APPROVED' && (
+            <Popconfirm
+              title="确认发布该演出？"
+              okText="确认"
+              cancelText="取消"
+              onConfirm={() => changeShowStatus(record, 'PUBLISHED')}
+            >
+              <Button type="link" size="small">发布</Button>
+            </Popconfirm>
+          )}
+          {record.status !== 'PUBLISHED' && record.auditStatus !== 'APPROVED' && (
+            <Button type="link" size="small" disabled title="需先审核通过后才能发布">发布</Button>
+          )}
+          {record.status === 'PUBLISHED' && (
+            <Popconfirm
+              title="确认下架该演出？"
+              okText="确认"
+              cancelText="取消"
+              onConfirm={() => changeShowStatus(record, 'UNPUBLISHED')}
+            >
+              <Button type="link" size="small">下架</Button>
+            </Popconfirm>
+          )}
           <Popconfirm
             title="确定删除该演出吗？"
             onConfirm={() => handleDelete(Number(record.showId))}

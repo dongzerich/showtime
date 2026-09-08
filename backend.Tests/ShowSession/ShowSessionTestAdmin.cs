@@ -117,6 +117,53 @@ public sealed class ShowSessionAdminControllersTests
     }
 
     [Fact]
+    public async Task GetAdminPricingStrategies_ReturnsAllTiersIncludingDisabledAndWindows()
+    {
+        await using var db = CreateDbContext();
+        var session = SeedShowSession(db, 1, 10);
+        var now = DateTime.UtcNow;
+        db.PriceStrategy.AddRange(
+            new PriceStrategy
+            {
+                SessionId = session.SessionId,
+                SeatSectionId = 1,
+                StrategyName = "早鸟票策略",
+                PriceType = "EARLY_BIRD",
+                Price = 100m,
+                SaleStartTime = now.AddDays(-5),
+                SaleEndTime = now.AddDays(-1),
+                Priority = 0,
+                Status = "ENABLED"
+            },
+            new PriceStrategy
+            {
+                SessionId = session.SessionId,
+                SeatSectionId = 2,
+                StrategyName = "标准票策略",
+                PriceType = "STANDARD",
+                Price = 180m,
+                SaleStartTime = now.AddDays(-1),
+                SaleEndTime = now.AddDays(5),
+                Priority = 1,
+                Status = "DISABLED"
+            }
+        );
+        await db.SaveChangesAsync();
+
+        var controller = CreateAdminController(db);
+        var actionResult = await controller.GetAdminPricingStrategies(session.SessionId, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var apiResponse = Assert.IsType<ApiResponse<IEnumerable<AdminPriceStrategyDto>>>(okResult.Value);
+        Assert.True(apiResponse.Success);
+        var strategies = apiResponse.Data!.ToList();
+        Assert.Equal(2, strategies.Count);
+        var disabled = strategies.Single(s => s.SeatSectionId == 2);
+        Assert.Equal(PriceStrategyStatus.DISABLED, disabled.Status);
+        Assert.Equal(PriceType.STANDARD, disabled.PriceType);
+    }
+
+    [Fact]
     public async Task ConfigurePriceStrategies_WhenSessionNotExists_ReturnsNotFound()
     {
         await using var db = CreateDbContext();

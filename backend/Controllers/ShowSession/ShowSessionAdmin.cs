@@ -101,6 +101,19 @@ public class AdminShowSessionController : ControllerBase
     }
 
     /// <summary>
+    /// 获取场次全部基础票价策略（管理端维护用，含禁用档与售票窗口）
+    /// </summary>
+    [HttpGet("sessions/{sessionId:long}/pricing-strategies")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<AdminPriceStrategyDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<IEnumerable<AdminPriceStrategyDto>>>> GetAdminPricingStrategies(
+        [FromRoute] long sessionId,
+        CancellationToken cancellationToken)
+    {
+        var strategies = await _adminService.GetAdminPricingStrategiesAsync(sessionId, cancellationToken);
+        return Ok(ApiResponse<IEnumerable<AdminPriceStrategyDto>>.Ok(strategies, "获取票价策略成功"));
+    }
+
+    /// <summary>
     /// 配置或覆盖更新场次基础票价策略
     /// </summary>
     /// <remarks>
@@ -290,6 +303,7 @@ public class AdminShowController : ControllerBase
     [HttpPut("{showId:long}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<object>>> UpdateShow(
         [FromRoute] long showId,
@@ -308,6 +322,32 @@ public class AdminShowController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(ApiResponse<object>.Fail("INVALID_ARGUMENT", ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ApiResponse<object>.Fail("OPERATION_CONFLICT", ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// 更新演出审核状态（通过/驳回）
+    /// </summary>
+    [HttpPut("{showId:long}/audit-status")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<object>>> UpdateShowAuditStatus(
+        [FromRoute] long showId,
+        [FromBody] UpdateShowAuditStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _showService.SetShowAuditStatusAsync(showId, request.AuditStatus, cancellationToken);
+            return Ok(ApiResponse<object>.Ok(null!, "演出审核状态已更新"));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse<object>.Fail("NOT_FOUND", ex.Message));
         }
     }
 

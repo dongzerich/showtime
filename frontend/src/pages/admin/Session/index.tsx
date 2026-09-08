@@ -13,6 +13,7 @@ import {
   DatePicker,
   message,
   Popconfirm,
+  Switch,
 } from 'antd'
 import dayjs from 'dayjs'
 import {
@@ -24,12 +25,34 @@ import {
   getSeatSections,
   getSeatMapList,
   configureDynamicPricingRules,
+  getAdminPricingStrategies,
+  addPricingStrategies,
   type ShowDto,
   type ShowSessionDto,
   type SeatMapResponse,
   type SessionStatus,
+  type PriceType,
   type CreateDynamicPricingRuleRequest,
 } from '../../../api/admin'
+
+const priceTypeOptions: { value: PriceType; label: string }[] = [
+  { value: 'EARLY_BIRD', label: '早鸟票' },
+  { value: 'PRESALE', label: '预售票' },
+  { value: 'STANDARD', label: '标准票' },
+  { value: 'VIP', label: 'VIP票' },
+  { value: 'MEMBER', label: '会员票' },
+]
+
+interface PriceStrategyRow {
+  priceStrategyId?: number
+  seatSectionId?: number
+  priceType: PriceType
+  price: number
+  strategyName?: string
+  saleWindow: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
+  enabled: boolean
+  priority: number
+}
 
 const sessionStatusMap: Record<SessionStatus, { text: string; color: string }> = {
   UPCOMING: { text: '待上架', color: 'default' },
@@ -57,6 +80,12 @@ const Session = () => {
   const [pricingSections, setPricingSections] = useState<{ seatSectionId: number | string; sectionName: string }[]>([])
   const [pricingSaving, setPricingSaving] = useState(false)
   const [pricingForm] = Form.useForm()
+  // 基础票价策略维护
+  const [strategyVisible, setStrategyVisible] = useState(false)
+  const [strategySession, setStrategySession] = useState<ShowSessionDto | null>(null)
+  const [strategySections, setStrategySections] = useState<{ seatSectionId: number | string; sectionName: string }[]>([])
+  const [strategyRows, setStrategyRows] = useState<PriceStrategyRow[]>([])
+  const [strategySaving, setStrategySaving] = useState(false)
 
   // 加载演出列表
   useEffect(() => {
@@ -261,6 +290,74 @@ const Session = () => {
     }
   }
 
+  // ========== 基础票价策略维护 ==========
+  const openPriceStrategies = async (session: ShowSessionDto) => {
+    setStrategySession(session)
+    setStrategyVisible(true)
+    setStrategySaving(false)
+    try {
+      const [sectionRes, listRes] = await Promise.all([
+        getSeatSections(Number(session.seatMapId), { PageSize: 100 }),
+        getAdminPricingStrategies(Number(session.sessionId)),
+      ])
+      const sections = sectionRes.data?.data?.items || []
+      setStrategySections(sections.map(s => ({ seatSectionId: s.seatSectionId, sectionName: s.sectionName || `票区#${s.seatSectionId}` })))
+      const list = listRes.data?.data || []
+      const rows: PriceStrategyRow[] = list.map(item => ({
+        priceStrategyId: Number(item.priceStrategyId),
+        seatSectionId: Number(item.seatSectionId),
+        priceType: item.priceType as PriceType,
+        price: Number(item.price),
+        strategyName: item.strategyName,
+        saleWindow: [item.saleStartTime ? dayjs(item.saleStartTime) : null, item.saleEndTime ? dayjs(item.saleEndTime) : null],
+        enabled: item.status === 'ENABLED',
+        priority: Number(item.priority || 0),
+      }))
+      setStrategyRows(rows.length > 0
+        ? rows
+        : [{ priceType: 'STANDARD', price: 0, saleWindow: null, enabled: true, priority: 0 }])
+    } catch {
+      message.error('加载票价策略失败')
+      setStrategyRows([{ priceType: 'STANDARD', price: 0, saleWindow: null, enabled: true, priority: 0 }])
+    }
+  }
+
+  const updateStrategyRow = <K extends keyof PriceStrategyRow>(index: number, key: K, value: PriceStrategyRow[K]) => {
+    setStrategyRows(rows => rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)))
+  }
+
+  const handleSavePriceStrategies = async () => {
+    if (!strategySession) return
+    if (strategyRows.some(row => !row.seatSectionId || row.priceType == null || row.price == null)) {
+      message.warning('请为每个票价档位选择票区、票种并填写价格')
+      return
+    }
+    setStrategySaving(true)
+    try {
+      const payload = strategyRows.map(row => ({
+        seatSectionId: Number(row.seatSectionId),
+        priceType: row.priceType,
+        price: Number(row.price),
+        strategyName: row.strategyName?.trim() || `${row.priceType}-${row.price}`,
+        saleStartTime: row.saleWindow?.[0] ? row.saleWindow[0].toISOString() : null,
+        saleEndTime: row.saleWindow?.[1] ? row.saleWindow[1].toISOString() : null,
+        priority: Number(row.priority || 0),
+        status: (row.enabled ? 'ENABLED' : 'DISABLED') as 'ENABLED' | 'DISABLED',
+      }))
+      const res = await addPricingStrategies(Number(strategySession.sessionId), payload)
+      if (!res.response?.ok) {
+        message.error('保存票价策略失败')
+        return
+      }
+      message.success('票价策略已保存（整批覆盖）')
+      setStrategyVisible(false)
+    } catch {
+      message.error('保存票价策略失败')
+    } finally {
+      setStrategySaving(false)
+    }
+  }
+
   const columns = [
     {
       title: '场次ID',
@@ -323,6 +420,9 @@ const Session = () => {
           </Button>
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
             详情
+          </Button>
+          <Button type="link" size="small" onClick={() => openPriceStrategies(record)}>
+            票价策略
           </Button>
           <Button type="link" size="small" onClick={() => openPricing(record)}>
             动态定价
@@ -567,6 +667,83 @@ const Session = () => {
             )}
           </Form.List>
         </Form>
+      </Modal>
+
+      <Modal
+        title={strategySession ? `基础票价策略（场次 ID: ${strategySession.sessionId}）` : '基础票价策略'}
+        open={strategyVisible}
+        onCancel={() => setStrategyVisible(false)}
+        width={1180}
+        footer={
+          <Space>
+            <Button onClick={() => setStrategyVisible(false)}>取消</Button>
+            <Button type="primary" loading={strategySaving} onClick={handleSavePriceStrategies}>
+              保存（整批覆盖）
+            </Button>
+          </Space>
+        }
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Tag color="gold">提示</Tag> 保存将替换该场次的全部基础票价档位。<Tag color="blue">时间票种</Tag>：同一票区同一时刻只生效一档——档位填写售票时间后按时间自动切换（早鸟→预售→标准），不填则整场生效；重叠时按优先级与票种序取档。
+        </div>
+        {strategyRows.map((row, index) => (
+          <div
+            key={index}
+            style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f0f0f0', padding: 8, borderRadius: 4, marginBottom: 8 }}
+          >
+            <Select
+              placeholder="票区"
+              value={row.seatSectionId}
+              onChange={v => updateStrategyRow(index, 'seatSectionId', v)}
+              style={{ width: 160 }}
+              options={strategySections.map(s => ({ value: Number(s.seatSectionId), label: s.sectionName }))}
+            />
+            <Select
+              placeholder="票种"
+              value={row.priceType}
+              onChange={v => updateStrategyRow(index, 'priceType', v)}
+              style={{ width: 120 }}
+              options={priceTypeOptions}
+            />
+            <InputNumber
+              placeholder="价格"
+              min={0}
+              value={row.price}
+              onChange={v => updateStrategyRow(index, 'price', v ?? 0)}
+              style={{ width: 120 }}
+              prefix="¥"
+            />
+            <Input
+              placeholder="策略名（可选）"
+              value={row.strategyName}
+              onChange={e => updateStrategyRow(index, 'strategyName', e.target.value)}
+              style={{ width: 160 }}
+            />
+            <DatePicker.RangePicker
+              showTime
+              value={row.saleWindow || undefined}
+              onChange={dates => updateStrategyRow(index, 'saleWindow', dates as PriceStrategyRow['saleWindow'])}
+              placeholder={['档位开售', '档位截止']}
+              style={{ width: 300 }}
+              format="YYYY-MM-DD HH:mm"
+              allowEmpty={[true, true]}
+            />
+            <Space size={4}>
+              <Switch checked={row.enabled} onChange={v => updateStrategyRow(index, 'enabled', v)} />
+              <span style={{ color: '#888', fontSize: 13 }}>{row.enabled ? '启用' : '停用'}</span>
+            </Space>
+            <Button type="text" danger disabled={strategyRows.length <= 1} onClick={() => setStrategyRows(rows => rows.filter((_, i) => i !== index))}>
+              删除
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="dashed"
+          block
+          onClick={() => setStrategyRows(rows => [...rows, { priceType: 'STANDARD', price: 0, saleWindow: null, enabled: true, priority: 0 }])}
+        >
+          + 添加票价档
+        </Button>
       </Modal>
     </div>
   )

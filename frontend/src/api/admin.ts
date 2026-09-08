@@ -48,7 +48,16 @@ export const getShowDetail = (showId: number) => {
   });
 };
 
-// 更新演出
+// ========== 演出相关 ==========
+export type UpdateShowAuditStatusRequest = components['schemas']['UpdateShowAuditStatusRequest'];
+
+export const updateShowAuditStatus = (showId: number, data: UpdateShowAuditStatusRequest) => {
+  return client.PUT('/api/admin/shows/{showId}/audit-status', {
+    params: { path: { showId } },
+    body: data,
+  });
+};
+
 export const updateShow = (showId: number, data: UpdateShowRequest) => {
   return client.PUT('/api/admin/shows/{showId}', {
     params: { path: { showId } },
@@ -99,6 +108,15 @@ export const addPricingStrategies = (sessionId: number, data: CreatePriceStrateg
   return client.POST('/api/admin/sessions/{sessionId}/pricing-strategies', {
     params: { path: { sessionId } },
     body: data,
+  });
+};
+
+// 管理端：获取场次全部基础票价策略（含禁用档与售票窗口，供维护弹窗使用）
+export type AdminPriceStrategyDto = components['schemas']['AdminPriceStrategyDto'];
+
+export const getAdminPricingStrategies = (sessionId: number) => {
+  return client.GET('/api/admin/sessions/{sessionId}/pricing-strategies', {
+    params: { path: { sessionId } },
   });
 };
 

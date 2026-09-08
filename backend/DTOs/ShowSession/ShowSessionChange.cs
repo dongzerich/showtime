@@ -36,7 +36,8 @@ public record CreatePriceStrategyRequest(
     DateTime? SaleStartTime = null,
     DateTime? SaleEndTime = null,
     int Priority = 0,
-    int? Quota = null
+    int? Quota = null,
+    PriceStrategyStatus Status = PriceStrategyStatus.ENABLED
 );
 
 /// <summary>

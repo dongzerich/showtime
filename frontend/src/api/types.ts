@@ -1798,7 +1798,30 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sessionId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfIEnumerableOfAdminPriceStrategyDto"];
+                        "application/json": components["schemas"]["ApiResponseOfIEnumerableOfAdminPriceStrategyDto"];
+                        "text/json": components["schemas"]["ApiResponseOfIEnumerableOfAdminPriceStrategyDto"];
+                    };
+                };
+            };
+        };
         put?: never;
         post: {
             parameters: {
@@ -2236,6 +2259,62 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/shows/{showId}/audit-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    showId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateShowAuditStatusRequest"];
+                    "text/json": components["schemas"]["UpdateShowAuditStatusRequest"];
+                    "application/*+json": components["schemas"]["UpdateShowAuditStatusRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfObject"];
+                        "application/json": components["schemas"]["ApiResponseOfObject"];
+                        "text/json": components["schemas"]["ApiResponseOfObject"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfObject"];
+                        "application/json": components["schemas"]["ApiResponseOfObject"];
+                        "text/json": components["schemas"]["ApiResponseOfObject"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6256,6 +6335,27 @@ export interface components {
             /** Format: date-time */
             createTime: string;
         };
+        AdminPriceStrategyDto: {
+            /** Format: int64 */
+            priceStrategyId: number | string;
+            /** Format: int64 */
+            sessionId: number | string;
+            /** Format: int64 */
+            seatSectionId: number | string;
+            strategyName: string;
+            priceType: components["schemas"]["PriceType"];
+            /** Format: double */
+            price: number | string;
+            /** Format: date-time */
+            saleStartTime: null | string;
+            /** Format: date-time */
+            saleEndTime: null | string;
+            /** Format: int32 */
+            priority: number | string;
+            /** Format: int32 */
+            quota: null | number | string;
+            status: components["schemas"]["PriceStrategyStatus"];
+        };
         AdminUserResponse: {
             /** Format: int64 */
             userId: number | string;
@@ -6312,6 +6412,12 @@ export interface components {
         ApiResponseOfFileUploadResponse: {
             success: boolean;
             data: null | components["schemas"]["FileUploadResponse"];
+            code: null | string;
+            message: string;
+        };
+        ApiResponseOfIEnumerableOfAdminPriceStrategyDto: {
+            success: boolean;
+            data: null | components["schemas"]["AdminPriceStrategyDto"][];
             code: null | string;
             message: string;
         };
@@ -6697,6 +6803,7 @@ export interface components {
             priority: number | string;
             /** Format: int32 */
             quota?: null | number | string;
+            status?: components["schemas"]["PriceStrategyStatus"];
         };
         CreateRefundRequest: {
             orderItemIds: (number | string)[];
@@ -7727,6 +7834,9 @@ export interface components {
         };
         UpdateSessionStatusRequest: {
             status: components["schemas"]["SessionStatus"];
+        };
+        UpdateShowAuditStatusRequest: {
+            auditStatus: components["schemas"]["ShowAuditStatus"];
         };
         UpdateShowRequest: {
             showName: string;

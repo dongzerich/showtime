@@ -71,11 +71,18 @@ public class ShowSessionService : IClientShowSessionService
         // 展示价算力取当前 UTC 时间
         var evaluationTime = _timeProvider.GetUtcNow().UtcDateTime;
 
-        return strategies.Select(p =>
+        // 方案 A：同一票区同一时刻只展示/返回一个“当前生效档”，按售票窗口 + 优先级 + 票种序裁决
+        var effectiveStrategies = strategies
+            .GroupBy(p => p.SeatSectionId)
+            .Select(g => PricingTierSelector.SelectEffective(g, g.Key, evaluationTime))
+            .OfType<PriceStrategy>()
+            .ToList();
+
+        return effectiveStrategies.Select(p =>
         {
             decimal finalPrice = session != null
-                ? PricingChange.CalculateRealtimePrice(p.Price, session.StartTime, evaluationTime, p.SeatSectionId, dynamicRules)
-                : p.Price;
+                ? PricingChange.CalculateRealtimePrice(p!.Price, session.StartTime, evaluationTime, p.SeatSectionId, dynamicRules)
+                : p!.Price;
 
             return new PricingStrategyDto(
                 p.PriceStrategyId,
@@ -240,7 +247,7 @@ public class AdminShowSessionService : IAdminShowSessionService
                     SaleEndTime = req.SaleEndTime ?? session.SaleEndTime,
                     Priority = req.Priority,
                     Quota = req.Quota,
-                    Status = PriceStrategyStatus.ENABLED.ToDbString(),
+                    Status = req.Status.ToDbString(),
                     CreateBy = currentOperator,
                     UpdateBy = currentOperator,
                     CreateTime = now,
@@ -366,6 +373,31 @@ public class AdminShowSessionService : IAdminShowSessionService
             .ToListAsync(cancellationToken);
 
         return sessions.Select(ShowSessionService.ToDto);
+    }
+
+    public async Task<IEnumerable<AdminPriceStrategyDto>> GetAdminPricingStrategiesAsync(
+        long sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        var strategies = await _context.PriceStrategy
+            .AsNoTracking()
+            .Where(p => p.SessionId == sessionId)
+            .OrderBy(p => p.SeatSectionId)
+            .ThenBy(p => p.PriceStrategyId)
+            .ToListAsync(cancellationToken);
+
+        return strategies.Select(p => new AdminPriceStrategyDto(
+            p.PriceStrategyId,
+            p.SessionId,
+            p.SeatSectionId,
+            p.StrategyName,
+            p.PriceType.ToEnum<PriceType>(),
+            p.Price,
+            p.SaleStartTime == default ? null : p.SaleStartTime,
+            p.SaleEndTime == default ? null : p.SaleEndTime,
+            p.Priority,
+            p.Quota,
+            p.Status.ToEnum<PriceStrategyStatus>()));
     }
 
     internal static ShowSessionDto ToDto(ShowtimeBackend.Entities.ShowSession.ShowSession s) => new(

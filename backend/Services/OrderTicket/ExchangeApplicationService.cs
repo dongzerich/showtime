@@ -155,10 +155,10 @@ public sealed class ExchangeApplicationService(
         var seats = await dbContext.Set<Seat>().AsNoTracking()
             .Where(item => targetSeatIds.Contains(item.SeatId))
             .ToDictionaryAsync(item => item.SeatId, cancellationToken);
-        var strategyIds = request.TargetItems.Select(item => item.PriceStrategyId).Distinct().ToArray();
         var strategies = await dbContext.Set<PriceStrategy>().AsNoTracking()
-            .Where(item => strategyIds.Contains(item.PriceStrategyId))
-            .ToDictionaryAsync(item => item.PriceStrategyId, cancellationToken);
+            .Where(item => item.SessionId == targetSession.SessionId && item.Status == "ENABLED")
+            .ToListAsync(cancellationToken);
+        var strategyById = strategies.ToDictionary(item => item.PriceStrategyId);
         var locks = await dbContext.Set<SeatLock>().AsNoTracking()
             .Where(item => item.SessionId == targetSession.SessionId && item.UserId == userId &&
                            targetSeatIds.Contains(item.SeatId) && item.LockStatus == "ACTIVE" &&
@@ -177,7 +177,7 @@ public sealed class ExchangeApplicationService(
                 return Conflict("EXCHANGE_TARGET_SEAT_UNAVAILABLE", "A target seat is unavailable.");
             }
 
-            if (!strategies.TryGetValue(requestedItem.PriceStrategyId, out var strategy) ||
+            if (!strategyById.TryGetValue(requestedItem.PriceStrategyId, out var strategy) ||
                 strategy.SessionId != targetSession.SessionId ||
                 strategy.SeatSectionId != seat.SeatSectionId || strategy.Status != "ENABLED")
             {
@@ -191,16 +191,24 @@ public sealed class ExchangeApplicationService(
             }
 
             var originalItem = originalItems[requestedItem.OriginalOrderItemId];
+
+            // 方案 A：改签目标价也按锁定时点的“当前生效票档”计价
+            var effective = PricingTierSelector.SelectEffective(strategies, seat.SeatSectionId, seatLock.CreateTime);
+            if (effective is null)
+            {
+                return Invalid("EXCHANGE_TARGET_NO_EFFECTIVE_PRICE", "The target region has no active price tier at lock time.");
+            }
+
             var newUnitPrice = PricingChange.CalculateRealtimePrice(
-                strategy.Price, targetSession.StartTime, seatLock.CreateTime,
-                strategy.SeatSectionId, dynamicRules);
+                effective.Price, targetSession.StartTime, seatLock.CreateTime,
+                effective.SeatSectionId, dynamicRules);
             if (!IsOracleAmount(originalItem.UnitPrice) || !IsOracleAmount(newUnitPrice))
             {
                 return Invalid("EXCHANGE_AMOUNT_INVALID", "An exchange amount is outside the supported range.");
             }
 
             quoteItems.Add(new ExchangeQuoteItemResponse(
-                originalItem.OrderItemId, requestedItem.SeatId, requestedItem.PriceStrategyId,
+                originalItem.OrderItemId, requestedItem.SeatId, effective.PriceStrategyId,
                 originalItem.RealNameId, originalItem.UnitPrice, newUnitPrice));
         }
 
