@@ -16,18 +16,18 @@ public sealed class PricingTierSelectorTests
         DateTime? saleEnd = null,
         int priority = 0,
         string status = "ENABLED") => new()
-    {
-        PriceStrategyId = id,
-        SessionId = 1,
-        SeatSectionId = sectionId,
-        StrategyName = priceType,
-        PriceType = priceType,
-        Price = price,
-        SaleStartTime = saleStart ?? default,
-        SaleEndTime = saleEnd ?? default,
-        Priority = priority,
-        Status = status,
-    };
+        {
+            PriceStrategyId = id,
+            SessionId = 1,
+            SeatSectionId = sectionId,
+            StrategyName = priceType,
+            PriceType = priceType,
+            Price = price,
+            SaleStartTime = saleStart ?? default,
+            SaleEndTime = saleEnd ?? default,
+            Priority = priority,
+            Status = status,
+        };
 
     [Fact]
     public void SelectEffective_UnsetWindow_IsAlwaysActive()
