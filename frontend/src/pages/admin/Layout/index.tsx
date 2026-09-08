@@ -23,8 +23,9 @@ const AdminLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // /admin 默认渲染数据看板，此时菜单需高亮数据看板项
-  const selectedKey = location.pathname === '/admin' ? '/admin/dashboard' : location.pathname
+  // /admin（含 /admin/）默认渲染数据看板，此时菜单需高亮数据看板项
+  const pathname = location.pathname.replace(/\/+$/, '') || '/'
+  const selectedKey = pathname === '/admin' ? '/admin/dashboard' : pathname
 
   const menuItems = [
     {

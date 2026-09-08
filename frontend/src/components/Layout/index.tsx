@@ -22,16 +22,10 @@ const Layout = () => {
               首页
             </span>
             <span
-              className={location.pathname === '/search' ? 'active' : ''}
+              className={location.pathname === '/search' || location.pathname.startsWith('/performance/') ? 'active' : ''}
               onClick={() => navigate('/search')}
             >
               演出列表
-            </span>
-            <span
-              className={location.pathname.startsWith('/performance/') ? 'active' : ''}
-              onClick={() => navigate('/search')}
-            >
-              演出详情
             </span>
             <span
               className={location.pathname === '/order' ? 'active' : ''}

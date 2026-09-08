@@ -9,6 +9,7 @@ import {
   LogoutOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import FileUploader from '@/components/FileUploader';
 import { updateAvatar } from '@/api/user';
@@ -21,7 +22,7 @@ const { Title, Text } = Typography;
 type RealName = components['schemas']['UserRealNameResponse'];
 
 // 菜单项配置
-const menuItems = [
+const baseMenuItems = [
   { key: 'profile', icon: <UserOutlined />, label: '个人资料' },
   { key: 'security', icon: <LockOutlined />, label: '账号安全' },
   { key: 'verify', icon: <IdcardOutlined />, label: '实名认证' },
@@ -32,6 +33,13 @@ const UserCenter = () => {
   const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState('profile');
   const { user, updateUser } = useUser();
+  // 管理端入口：仅 Admin 角色可见
+  const isAdmin = Array.isArray(user.roles) && user.roles.includes('Admin');
+  const menuItems = [
+    ...baseMenuItems.slice(0, 3),
+    ...(isAdmin ? [{ key: 'admin', icon: <SettingOutlined />, label: '管理后台' }] : []),
+    ...baseMenuItems.slice(3),
+  ];
   const [avatarUpdating, setAvatarUpdating] = useState(false);
   const [realNames, setRealNames] = useState<RealName[]>([]);
   const [realNameModalOpen, setRealNameModalOpen] = useState(false);
@@ -293,7 +301,9 @@ const UserCenter = () => {
               label: item.label,
               danger: item.danger,
               onClick: () => {
-                if (item.key === 'logout') {
+                if (item.key === 'admin') {
+                  navigate('/admin');
+                } else if (item.key === 'logout') {
                   handleLogout();
                 } else {
                   setSelectedKey(item.key);
