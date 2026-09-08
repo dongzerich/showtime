@@ -426,6 +426,40 @@
         ]
       }
     },
+    "/api/admin/venues": {
+      "get": {
+        "tags": [
+          "Seat Zone Administration - Venues"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/auth/register": {
       "post": {
         "tags": [
@@ -16907,6 +16941,83 @@
           },
           "isCurrent": {
             "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseOfIEnumerableOfVenueResponse": {
+        "required": [
+          "success",
+          "data",
+          "code",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/VenueResponse"
+            }
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "VenueResponse": {
+        "required": [
+          "venueId",
+          "venueName",
+          "address",
+          "contactPhone",
+          "status",
+          "remark"
+        ],
+        "type": "object",
+        "properties": {
+          "venueId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "venueName": {
+            "type": "string"
+          },
+          "address": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "contactPhone": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "remark": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       }
