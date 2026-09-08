@@ -23,6 +23,9 @@ const AdminLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // /admin 默认渲染数据看板，此时菜单需高亮数据看板项
+  const selectedKey = location.pathname === '/admin' ? '/admin/dashboard' : location.pathname
+
   const menuItems = [
     {
       key: '/admin/dashboard',
@@ -113,7 +116,7 @@ const AdminLayout = () => {
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[selectedKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
         />
