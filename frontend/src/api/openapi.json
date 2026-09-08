@@ -426,40 +426,7 @@
         ]
       }
     },
-    "/api/admin/venues": {
-      "get": {
-        "tags": [
-          "Seat Zone Administration - Venues"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
+
     "/api/auth/register": {
       "post": {
         "tags": [
@@ -3299,7 +3266,40 @@
         ]
       }
     },
-    "/api/sessions/{sessionId}/seat-locks": {
+    "/api/admin/venues": {
+      "get": {
+        "tags": [
+          "Seat Zone Administration - Venues"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOfIEnumerableOfVenueResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },    "/api/sessions/{sessionId}/seat-locks": {
       "post": {
         "tags": [
           "Seat Locks"
@@ -10472,7 +10472,38 @@
           }
         }
       },
-      "ApiResponseOfIReadOnlyListOfPaymentResponse": {
+      "ApiResponseOfIEnumerableOfVenueResponse": {
+        "required": [
+          "success",
+          "data",
+          "code",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/VenueResponse"
+            }
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },      "ApiResponseOfIReadOnlyListOfPaymentResponse": {
         "required": [
           "success",
           "data",
@@ -16944,38 +16975,7 @@
           }
         }
       },
-      "ApiResponseOfIEnumerableOfVenueResponse": {
-        "required": [
-          "success",
-          "data",
-          "code",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/VenueResponse"
-            }
-          },
-          "code": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      },
+
       "VenueResponse": {
         "required": [
           "venueId",
@@ -17066,6 +17066,8 @@
       "name": "AdminShow"
     },
     {
+      "name": "Seat Zone Administration - Venues"
+    },    {
       "name": "Seat Locks"
     },
     {
@@ -17080,9 +17082,7 @@
     {
       "name": "Seat Zone Administration - Seat Sections"
     },
-    {
-      "name": "Seat Zone Administration - Venues"
-    },
+
     {
       "name": "Sessions"
     },
