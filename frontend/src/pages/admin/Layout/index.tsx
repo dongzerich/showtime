@@ -14,6 +14,7 @@ import {
   FileSyncOutlined,
   ControlOutlined,
   QrcodeOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 
 const { Sider, Content } = Layout
@@ -27,6 +28,11 @@ const AdminLayout = () => {
       key: '/admin/dashboard',
       icon: <DashboardOutlined />,
       label: '数据看板',
+    },
+    {
+      key: '/admin/user',
+      icon: <TeamOutlined />,
+      label: '用户管理',
     },
     {
       key: '/admin/performance',

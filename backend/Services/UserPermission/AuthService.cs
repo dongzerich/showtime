@@ -29,12 +29,17 @@ public sealed partial class AuthService(
 
     public async Task<AuthServiceResult<RegisterResponse>> RegisterAsync(
         RegisterRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? actorUserName = null)
     {
         var userName = request.UserName.Trim();
         var phone = request.Phone.Trim();
         var email = NormalizeOptionalEmail(request.Email);
         var nickname = NormalizeOptionalText(request.Nickname);
+        // 管理端代建账号时以操作人作为创建者；自助注册沿用注册用户名。
+        var creator = string.IsNullOrWhiteSpace(actorUserName)
+            ? userName
+            : actorUserName.Trim();
 
         var conflict = await FindRegistrationConflictAsync(
             userName,
@@ -66,8 +71,8 @@ public sealed partial class AuthService(
             Email = email,
             UserType = "NORMAL",
             Status = 1,
-            CreateBy = userName,
-            UpdateBy = userName,
+            CreateBy = creator,
+            UpdateBy = creator,
         };
         user.PasswordHash = passwordHasher.HashPassword(user, request.Password);
         user.UserRoles.Add(new UserRole { RoleId = defaultRole.RoleId });

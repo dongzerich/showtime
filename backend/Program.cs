@@ -396,6 +396,7 @@ builder.Services.AddSingleton<ITicketTokenService, HmacTicketTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
 builder.Services.AddScoped<IUserRealNameService, UserRealNameService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddSingleton<IOperationLogWriter, DatabaseOperationLogWriter>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();

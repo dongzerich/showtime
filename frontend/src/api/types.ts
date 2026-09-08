@@ -39,6 +39,235 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Keyword?: string;
+                    Status?: number | string;
+                    PageIndex?: number | string;
+                    PageSize?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfPagedResponseOfAdminUserResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RegisterRequest"];
+                    "text/json": components["schemas"]["RegisterRequest"];
+                    "application/*+json": components["schemas"]["RegisterRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "application/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                        "text/json": components["schemas"]["ApiResponseOfAdminUserResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfboolean"];
+                        "application/json": components["schemas"]["ApiResponseOfboolean"];
+                        "text/json": components["schemas"]["ApiResponseOfboolean"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfboolean"];
+                        "application/json": components["schemas"]["ApiResponseOfboolean"];
+                        "text/json": components["schemas"]["ApiResponseOfboolean"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfboolean"];
+                        "application/json": components["schemas"]["ApiResponseOfboolean"];
+                        "text/json": components["schemas"]["ApiResponseOfboolean"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfboolean"];
+                        "application/json": components["schemas"]["ApiResponseOfboolean"];
+                        "text/json": components["schemas"]["ApiResponseOfboolean"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ApiResponseOfboolean"];
+                        "application/json": components["schemas"]["ApiResponseOfboolean"];
+                        "text/json": components["schemas"]["ApiResponseOfboolean"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/register": {
         parameters: {
             query?: never;
@@ -5890,6 +6119,29 @@ export interface components {
             /** Format: date-time */
             createTime: string;
         };
+        AdminUserResponse: {
+            /** Format: int64 */
+            userId: number | string;
+            userName: string;
+            nickname: null | string;
+            phone: string;
+            email: null | string;
+            avatarUrl: null | string;
+            userType: string;
+            /** Format: uint8 */
+            status: number | string;
+            roles: string[];
+            /** Format: date-time */
+            createTime: string;
+            /** Format: date-time */
+            updateTime: string;
+        };
+        ApiResponseOfAdminUserResponse: {
+            success: boolean;
+            data: null | components["schemas"]["AdminUserResponse"];
+            code: null | string;
+            message: string;
+        };
         ApiResponseOfboolean: {
             success: boolean;
             data: boolean;
@@ -6037,6 +6289,12 @@ export interface components {
         ApiResponseOfPagedRefundResponse: {
             success: boolean;
             data: null | components["schemas"]["PagedRefundResponse"];
+            code: null | string;
+            message: string;
+        };
+        ApiResponseOfPagedResponseOfAdminUserResponse: {
+            success: boolean;
+            data: null | components["schemas"]["PagedResponseOfAdminUserResponse"];
             code: null | string;
             message: string;
         };
@@ -6676,6 +6934,15 @@ export interface components {
         };
         PagedRefundResponse: {
             items: components["schemas"]["RefundSummaryResponse"][];
+            /** Format: int32 */
+            page: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            /** Format: int32 */
+            totalCount: number | string;
+        };
+        PagedResponseOfAdminUserResponse: {
+            items: components["schemas"]["AdminUserResponse"][];
             /** Format: int32 */
             page: number | string;
             /** Format: int32 */
