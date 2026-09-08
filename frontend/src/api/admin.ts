@@ -510,3 +510,31 @@ export const deleteMarketingContent = (contentId: number) => {
     params: { path: { contentId } },
   });
 };
+
+// ========== 用户管理（管理端） ==========
+export type AdminUser = components['schemas']['AdminUserResponse'];
+export type CreateAdminUserRequest = components['schemas']['RegisterRequest'];
+
+// 管理端：分页查询用户列表（支持关键字/状态筛选）
+export const getAdminUserList = (params?: {
+  Keyword?: string;
+  Status?: number;
+  PageIndex?: number;
+  PageSize?: number;
+}) => {
+  return client.GET('/api/admin/users', {
+    params: { query: params },
+  });
+};
+
+// 管理端：创建用户（默认绑定 USER 角色）
+export const createAdminUser = (data: CreateAdminUserRequest) => {
+  return client.POST('/api/admin/users', { body: data });
+};
+
+// 管理端：删除用户（仅无订单/票务/会话等关联数据时可删除）
+export const deleteAdminUser = (userId: number) => {
+  return client.DELETE('/api/admin/users/{userId}', {
+    params: { path: { userId } },
+  });
+};

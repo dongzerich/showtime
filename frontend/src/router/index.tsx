@@ -20,6 +20,7 @@ import RefundPolicy from '../pages/admin/RefundPolicy';
 import ExchangePolicy from '../pages/admin/ExchangePolicy';
 import SeatRule from '../pages/admin/SeatRule';
 import Redeem from '../pages/admin/Redeem';
+import AdminUser from '../pages/admin/User';
 
 // ========== 客户端页面懒加载 ==========
 const Home = lazy(() => import('../pages/Home'));
@@ -92,6 +93,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'dashboard', element: <Dashboard /> },
+      { path: 'user', element: <AdminUser /> },
       { path: 'performance', element: <Performance /> },
       { path: 'session', element: <Session /> },
       { path: 'order', element: <AdminOrder /> },
