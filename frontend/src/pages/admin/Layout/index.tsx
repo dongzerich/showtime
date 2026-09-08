@@ -124,7 +124,15 @@ const AdminLayout = () => {
 
       {/* 右侧白色内容区：页面级滚动收敛到内容区，避免撑大整页导致侧边栏留白 */}
       <Layout style={{ overflow: 'auto' }}>
-        <Content style={{ margin: 24, padding: 24, background: 'white', borderRadius: 4 }}>
+        {/* flex:none + minHeight 保证白色内容卡随内容伸展，不被 antd 的 min-height:0 压缩成两层 */}
+        <Content style={{
+          margin: 24,
+          padding: 24,
+          background: 'white',
+          borderRadius: 4,
+          flex: 'none',
+          minHeight: 'calc(100vh - 48px)',
+        }}>
           <Outlet /> {/* 子页面内容显示在这里 */}
         </Content>
       </Layout>
