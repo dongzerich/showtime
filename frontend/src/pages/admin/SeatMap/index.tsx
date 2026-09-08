@@ -26,6 +26,8 @@ import {
 } from '@ant-design/icons';
 import {
   getSeatMapList,
+  createSeatMap,
+  createSeatSection,
   getSeatSections,
   getSeats,
   createSeat,
@@ -34,11 +36,13 @@ import {
   updateSeat,
   getSeatRuleList,
   getSeatRuleScopes,
+  getVenues,
   type SeatMapResponse,
   type SeatSectionResponse,
   type SeatResponse,
   type SeatRequest,
   type SeatRuleScope,
+  type VenueResponse,
 } from '../../../api/admin';
 
 const SEAT_TYPES = [
@@ -80,11 +84,33 @@ const SeatMapEditor = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [editForm] = Form.useForm();
 
+  // 新建座位图 / 新建票区
+  const [venues, setVenues] = useState<VenueResponse[]>([]);
+  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [mapModalLoading, setMapModalLoading] = useState(false);
+  const [mapForm] = Form.useForm();
+  const [sectionModalVisible, setSectionModalVisible] = useState(false);
+  const [sectionModalLoading, setSectionModalLoading] = useState(false);
+  const [sectionForm] = Form.useForm();
+
   useEffect(() => {
-    getSeatMapList({ PageSize: 100 }).then(res => {
-      if (res.data?.data?.items) setSeatMaps(res.data.data.items);
-    }).catch(() => message.error('加载座位图列表失败'));
+    getVenues().then(res => {
+      if (res.data?.data) setVenues(res.data.data);
+    }).catch(() => message.error('加载场馆列表失败'));
   }, []);
+
+  const loadSeatMaps = useCallback(async () => {
+    try {
+      const res = await getSeatMapList({ PageSize: 100 });
+      if (res.data?.data?.items) setSeatMaps(res.data.data.items);
+    } catch {
+      message.error('加载座位图列表失败');
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSeatMaps();
+  }, [loadSeatMaps]);
 
   const loadAppliedRules = useCallback(async (mapId: number | null, sectionId: number | null) => {
     if (!mapId) {
@@ -202,6 +228,77 @@ const SeatMapEditor = () => {
       message.error(errMsg);
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  const handleCreateMap = async () => {
+    try {
+      const values = await mapForm.validateFields();
+      setMapModalLoading(true);
+      const res = await createSeatMap({
+        venueId: values.venueId,
+        mapCode: values.mapCode.trim(),
+        mapName: values.mapName.trim(),
+        mapVersion: values.mapVersion.trim() || 'V1',
+        isDefault: values.isDefault || false,
+        mapWidth: values.mapWidth ?? null,
+        mapHeight: values.mapHeight ?? null,
+        mapStatus: values.mapStatus || 'DRAFT',
+        remark: values.remark || null,
+      });
+      const mapId = Number(res.data?.data?.seatMapId);
+      if (!mapId) {
+        message.error('新建座位图失败');
+        return;
+      }
+      message.success('座位图创建成功');
+      setMapModalVisible(false);
+      mapForm.resetFields();
+      await loadSeatMaps();
+      handleMapChange(mapId);
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return;
+      const errMsg = (err as { message?: string })?.message || '新建座位图失败';
+      message.error(errMsg);
+    } finally {
+      setMapModalLoading(false);
+    }
+  };
+
+  const handleCreateSection = async () => {
+    if (!selectedMapId) return;
+    try {
+      const values = await sectionForm.validateFields();
+      setSectionModalLoading(true);
+      const res = await createSeatSection(selectedMapId, {
+        sectionCode: values.sectionCode.trim(),
+        sectionName: values.sectionName.trim(),
+        sectionType: values.sectionType || 'NORMAL',
+        sectionColor: values.sectionColor || null,
+        floorNo: values.floorNo || null,
+        isSellable: values.isSellable !== false,
+        displayOrder: values.displayOrder || 0,
+        remark: values.remark || null,
+      });
+      const sectionId = Number(res.data?.data?.seatSectionId);
+      if (!sectionId) {
+        message.error('新建票区失败');
+        return;
+      }
+      message.success('票区创建成功');
+      setSectionModalVisible(false);
+      sectionForm.resetFields();
+      if (selectedMapId) {
+        getSeatSections(selectedMapId, { PageSize: 100 }).then(r => {
+          if (r.data?.data?.items) setSections(r.data.data.items);
+        });
+      }
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return;
+      const errMsg = (err as { message?: string })?.message || '新建票区失败';
+      message.error(errMsg);
+    } finally {
+      setSectionModalLoading(false);
     }
   };
 
@@ -358,6 +455,9 @@ const SeatMapEditor = () => {
     <div>
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space size="large">
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { mapForm.resetFields(); setMapModalVisible(true); }}>
+            新建座位图
+          </Button>
           <div>
             <span style={{ marginRight: 8 }}>座位图：</span>
             <Select
@@ -395,6 +495,9 @@ const SeatMapEditor = () => {
           </div>
           <Button icon={<ReloadOutlined />} onClick={() => selectedSectionId && loadSeats(selectedSectionId)} disabled={!selectedSectionId}>
             刷新
+          </Button>
+          <Button icon={<PlusOutlined />} disabled={!selectedMapId} onClick={() => { sectionForm.resetFields(); setSectionModalVisible(true); }}>
+            新建票区
           </Button>
           <Button icon={<AppstoreOutlined />} onClick={() => navigate('/admin/seat-rule')}>
             座位规则
@@ -628,6 +731,126 @@ const SeatMapEditor = () => {
             </Radio.Group>
           </Form.Item>
           <div style={{ color: '#999', fontSize: 12 }}>未设置的字段将保持原值不变。</div>
+        </Form>
+      </Modal>
+
+      {/* 新建座位图弹窗 */}
+      <Modal
+        title="新建座位图"
+        open={mapModalVisible}
+        onCancel={() => setMapModalVisible(false)}
+        onOk={handleCreateMap}
+        confirmLoading={mapModalLoading}
+        okText="确定"
+        cancelText="取消"
+        width={560}
+      >
+        <Form form={mapForm} layout="vertical" style={{ marginTop: 8 }} initialValues={{ mapVersion: 'V1', mapStatus: 'DRAFT', isDefault: false }}>
+          <Form.Item label="场馆" name="venueId" rules={[{ required: true, message: '请选择场馆' }]}>
+            <Select placeholder="请选择场馆" showSearch optionFilterProp="children">
+              {venues.map(venue => (
+                <Select.Option key={venue.venueId} value={Number(venue.venueId)}>
+                  {venue.venueName}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Space size="large" style={{ width: '100%' }}>
+            <Form.Item label="座位图名称" name="mapName" rules={[{ required: true, message: '请输入座位图名称' }]} style={{ width: 220 }}>
+              <Input maxLength={100} />
+            </Form.Item>
+            <Form.Item label="座位图编码" name="mapCode" rules={[{ required: true, message: '请输入座位图编码' }]} style={{ width: 220 }}>
+              <Input maxLength={50} placeholder="如 MAP_A" />
+            </Form.Item>
+          </Space>
+          <Space size="large" style={{ width: '100%' }}>
+            <Form.Item label="版本" name="mapVersion" style={{ width: 140 }}>
+              <Input maxLength={20} />
+            </Form.Item>
+            <Form.Item label="地图宽度" name="mapWidth" style={{ width: 160 }}>
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} placeholder="如 1000" />
+            </Form.Item>
+            <Form.Item label="地图高度" name="mapHeight" style={{ width: 160 }}>
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} placeholder="如 700" />
+            </Form.Item>
+          </Space>
+          <Space size="large" style={{ width: '100%' }}>
+            <Form.Item label="状态" name="mapStatus" style={{ width: 160 }}>
+              <Select options={[
+                { value: 'DRAFT', label: '草稿' },
+                { value: 'ENABLED', label: '启用' },
+                { value: 'DISABLED', label: '停用' },
+              ]} />
+            </Form.Item>
+            <Form.Item label="设为默认" name="isDefault" valuePropName="checked" style={{ width: 160, marginTop: 6 }}>
+              <Switch checkedChildren="是" unCheckedChildren="否" />
+            </Form.Item>
+          </Space>
+          <Form.Item label="备注" name="remark">
+            <Input maxLength={255} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 新建票区弹窗 */}
+      <Modal
+        title="新建票区"
+        open={sectionModalVisible}
+        onCancel={() => setSectionModalVisible(false)}
+        onOk={handleCreateSection}
+        confirmLoading={sectionModalLoading}
+        okText="确定"
+        cancelText="取消"
+        width={520}
+      >
+        <Form form={sectionForm} layout="vertical" style={{ marginTop: 8 }} initialValues={{ sectionType: 'NORMAL', sectionColor: '#1677ff', isSellable: true, displayOrder: 0 }}>
+          <Space size="large" style={{ width: '100%' }}>
+            <Form.Item label="票区名称" name="sectionName" rules={[{ required: true, message: '请输入票区名称' }]} style={{ width: 200 }}>
+              <Input maxLength={50} placeholder="如 A区" />
+            </Form.Item>
+            <Form.Item label="票区编码" name="sectionCode" rules={[{ required: true, message: '请输入票区编码' }]} style={{ width: 200 }}>
+              <Input maxLength={50} placeholder="如 SEC_A" />
+            </Form.Item>
+          </Space>
+          <Space size="large" style={{ width: '100%' }}>
+            <Form.Item label="票区类型" name="sectionType" style={{ width: 180 }}>
+              <Select options={[
+                { value: 'NORMAL', label: '普通区' },
+                { value: 'VIP', label: 'VIP区' },
+                { value: 'ACCESSIBLE', label: '无障碍区' },
+                { value: 'STANDING', label: '站票区' },
+              ]} />
+            </Form.Item>
+            <Form.Item label="显示颜色" name="sectionColor" style={{ width: 180 }}>
+              <Select showSearch allowClear>
+                {[
+                  { value: '#1677ff', label: '蓝色 #1677ff' },
+                  { value: '#3498DB', label: '天蓝 #3498DB' },
+                  { value: '#2ECC71', label: '绿色 #2ECC71' },
+                  { value: '#F39C12', label: '橙色 #F39C12' },
+                  { value: '#9B59B6', label: '紫色 #9B59B6' },
+                  { value: '#E74C3C', label: '红色 #E74C3C' },
+                  { value: '#1ABC9C', label: '青色 #1ABC9C' },
+                ].map(c => (
+                  <Select.Option key={c.value} value={c.value}>{c.label}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Space>
+          <Space size="large" style={{ width: '100%' }}>
+            <Form.Item label="楼层" name="floorNo" style={{ width: 180 }}>
+              <Input maxLength={20} placeholder="如 1F" />
+            </Form.Item>
+            <Form.Item label="排序" name="displayOrder" style={{ width: 160 }}>
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item label="可售" name="isSellable" valuePropName="checked" style={{ width: 120, marginTop: 6 }}>
+              <Switch checkedChildren="是" unCheckedChildren="否" />
+            </Form.Item>
+          </Space>
+          <Form.Item label="备注" name="remark">
+            <Input maxLength={255} />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

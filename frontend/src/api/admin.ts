@@ -100,13 +100,28 @@ export const updateSessionStatus = (sessionId: number, data: UpdateSessionStatus
   });
 };
 
+// ========== 场馆相关（管理端） ==========
+export type VenueResponse = components['schemas']['VenueResponse'];
+
+// 获取启用中的场馆列表（新建座位图时选择场馆）
+export const getVenues = () => {
+  return client.GET('/api/admin/venues', {});
+};
+
 // ========== 座位图/票区相关 ==========
 export type SeatMapResponse = components['schemas']['SeatMapResponse'];
+export type SeatMapRequest = components['schemas']['SeatMapRequest'];
 export type SeatSectionResponse = components['schemas']['SeatSectionResponse'];
+export type SeatSectionRequest = components['schemas']['SeatSectionRequest'];
 export type SeatResponse = components['schemas']['SeatResponse'];
 export type SeatRequest = components['schemas']['SeatRequest'];
 export type SeatBatchUpdateRequest = components['schemas']['SeatBatchUpdateRequest'];
 export type SeatBatchUpdateResponse = components['schemas']['SeatBatchUpdateResponse'];
+
+// 新建座位图
+export const createSeatMap = (data: SeatMapRequest) => {
+  return client.POST('/api/admin/seat-maps', { body: data });
+};
 
 // 获取座位图列表
 export const getSeatMapList = (params?: {
@@ -118,6 +133,14 @@ export const getSeatMapList = (params?: {
 }) => {
   return client.GET('/api/admin/seat-maps', {
     params: { query: params },
+  });
+};
+
+// 新建票区
+export const createSeatSection = (seatMapId: number, data: SeatSectionRequest) => {
+  return client.POST('/api/admin/seat-maps/{seatMapId}/sections', {
+    params: { path: { seatMapId } },
+    body: data,
   });
 };
 
