@@ -101,8 +101,8 @@ const AdminLayout = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', minWidth: 1280 }}>
-      {/* 左侧深色侧边栏 */}
-      <Sider width={200} theme="dark">
+      {/* 左侧深色侧边栏：吸顶并占满整屏，内容下滑时始终覆盖全页 */}
+      <Sider width={200} theme="dark" style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'auto' }}>
         <div style={{
           height: 64,
           color: 'white',
