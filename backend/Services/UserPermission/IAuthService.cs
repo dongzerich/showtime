@@ -6,7 +6,8 @@ public interface IAuthService
 {
     Task<AuthServiceResult<RegisterResponse>> RegisterAsync(
         RegisterRequest request,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? actorUserName = null);
 
     Task<AuthServiceResult<LoginResponse>> LoginAsync(
         LoginRequest request,
