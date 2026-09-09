@@ -364,6 +364,9 @@ builder.Services
         // 并使 OpenAPI 生成 enum 约束进入 schema。
         options.JsonSerializerOptions.Converters.Add(
             new JsonStringEnumConverter(allowIntegerValues: false));
+        // 时间统一按 UTC 输出（带 Z），避免 Oracle 无时区 TIMESTAMP 回读后被前端误当本地时间
+        options.JsonSerializerOptions.Converters.Add(
+            new ShowtimeBackend.Common.Json.UtcDateTimeJsonConverterFactory());
     })
     .ConfigureApiBehaviorOptions(options =>
     {

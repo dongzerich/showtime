@@ -231,7 +231,7 @@ namespace ShowtimeBackend.TestData
             }
 
             var sessions = new List<UserSession>();
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             foreach (var user in users)
             {
                 int count = user.UserName == AdminUserName ? _random.Next(3, 6) : _random.Next(1, 3);
@@ -289,7 +289,7 @@ namespace ShowtimeBackend.TestData
 
             var showList = shows.ToList();
             var entries = new List<UserBlacklist>();
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             var reasons = new[]
             {
                 "短时间内高频提交退票申请",

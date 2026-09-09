@@ -227,7 +227,7 @@ namespace ShowtimeBackend.TestData
         /// <summary>把随机生成的场次状态修正为与时间线一致的合法状态（新库首次生成时使用）</summary>
         private static void NormalizeSessionStatuses(IEnumerable<ShowSession> sessions)
         {
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             foreach (var session in sessions)
             {
                 if (session.SessionStatus == "ENDED" || session.StartTime <= now)
@@ -520,7 +520,7 @@ namespace ShowtimeBackend.TestData
                     Status = statuses[_random.Next(statuses.Length)],
                     AuditStatus = auditStatuses[_random.Next(auditStatuses.Length)],
                     AuditBy = _random.Next(0, 3) == 0 ? null : AdminUserName,
-                    AuditTime = _random.Next(0, 3) == 0 ? null : DateTime.Now.AddDays(-_random.Next(1, 60))
+                    AuditTime = _random.Next(0, 3) == 0 ? null : DateTime.UtcNow.AddDays(-_random.Next(1, 60))
                 });
             }
             return shows;
@@ -556,7 +556,7 @@ namespace ShowtimeBackend.TestData
         private List<ShowSession> GenerateShowSessions(List<Show> shows, List<SeatMap> seatMaps)
         {
             var showSessions = new List<ShowSession>();
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
 
             foreach (var show in shows)
             {

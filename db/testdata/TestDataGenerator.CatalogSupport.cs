@@ -62,7 +62,7 @@ namespace ShowtimeBackend.TestData
                             : $"https://picsum.photos/seed/mkt{show.ShowId}{i}/800/400",
                         SortOrder = i,
                         Status = enabled ? "ENABLED" : "DISABLED",
-                        PublishTime = enabled ? DateTime.Now.AddDays(-_random.Next(0, 30)) : null,
+                        PublishTime = enabled ? DateTime.UtcNow.AddDays(-_random.Next(0, 30)) : null,
                         CreateBy = DefaultActor,
                         UpdateBy = DefaultActor
                     });

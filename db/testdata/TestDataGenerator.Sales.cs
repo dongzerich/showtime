@@ -55,7 +55,7 @@ namespace ShowtimeBackend.TestData
                 return new SalesStats(0, 0, 0, 0, 0, 0, 0, 0);
             }
 
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             var buyers = LoadBuyers();
             if (buyers.Count == 0)
             {
@@ -850,7 +850,7 @@ namespace ShowtimeBackend.TestData
             var span = end - start;
             var minutes = _random.Next(0, Math.Max(1, (int)span.TotalMinutes));
             var candidate = start.AddMinutes(minutes);
-            return candidate <= DateTime.Now ? candidate : DateTime.Now.AddMinutes(-_random.Next(1, 20));
+            return candidate <= DateTime.UtcNow ? candidate : DateTime.UtcNow.AddMinutes(-_random.Next(1, 20));
         }
     }
 }

@@ -17,6 +17,10 @@
 .session-selector .ant-radio-button-wrapper {
   border-radius: 6px !important;
   margin: 0 4px;
+  /* 按钮内容为“时间 + 场馆/座位图”两行，需让高度随内容撑开，避免第二行溢出到白色背景 */
+  height: auto;
+  min-height: 32px;
+  line-height: normal;
 }
 
 .session-selector .ant-radio-button-wrapper > span:last-child {
