@@ -371,7 +371,7 @@ test.describe.serial('管理端 E2E：缺口补全功能', () => {
     await loginAdmin(page);
 
     await page.goto(`${BASE_URL}/admin/redeem`);
-    await page.locator('input[placeholder="粘贴电子票二维码内容或票号"]').fill('MOCK-QR-1001');
+    await page.locator('input[placeholder="扫码或粘贴电子票完整二维码内容"]').fill('MOCK-QR-1001');
     await page.locator('input[placeholder="如：闸机01 / 检票口A"]').fill('闸机01');
     await buttonWithChinese(page, '核销').click();
 
