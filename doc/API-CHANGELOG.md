@@ -7,6 +7,14 @@
 
 ## 变更时间线
 
+### 2026-09-09 · 时间统一改为 UTC
+
+脚本：`db/migrations/20260909__utc_timestamps.sql`、`db/migrations/20260909__utc_triggers_explicit.sql`
+
+- 全部 TIMESTAMP 默认值与触发器赋值由会话时区（`CURRENT_TIMESTAMP`）改为 `SYS_EXTRACT_UTC(SYSTIMESTAMP)`。
+- 配套后端 UTC 序列化：API 时间统一输出带 `Z` 的 ISO 8601（`UtcDateTimeJsonConverter`），无接口变更。
+- 说明：历史演示数据为本地时区与 UTC 混合，切换后需重新生成测试数据（见 `db/testdata`）。
+
 ### 2026-09-08 · 管理端用户管理
 
 - 新增管理端用户接口（无 Schema 变更）：`GET /api/admin/users`（分页/关键字/状态查询）、`POST /api/admin/users`（创建，默认绑定 USER 角色）、`DELETE /api/admin/users/{userId}`（删除，仅无订单/票务/会话/实名等关联数据时可物理删除，否则 409）。
@@ -71,7 +79,7 @@
 
 脚本：`db/migrations/20260905__order_event_outbox.sql`
 
-- 新增表 `ORDER_EVENT_OUTBOX`，支撑订单/退款事件的事务性发布。
+- 新增表 `T_ORDER_EVENT_OUTBOX`，支撑订单/退款事件的事务性发布。
 - 事件类型：`OrderCreatedEvent`、`RefundApprovedEvent`、`RefundStatusChangedEvent`。
 - 对应链路：订单/退款写入 Outbox → 后台 Worker 轮询发布（RabbitMQ 或进程内）→ 消费者 → SignalR 推送前端。
 
@@ -107,6 +115,12 @@
 | 方法 | 路径 | 身份 |
 |------|------|------|
 | POST | `/api/files/upload` | JWT |
+
+### 客户端公共 `/api/categories`
+
+| 方法 | 路径 | 身份 |
+|------|------|------|
+| GET | `/api/categories` | 匿名 |
 
 ### 客户端演出/场次 `/api/client`
 
@@ -159,9 +173,11 @@
 | POST/GET | `/api/admin/shows` | 演出增查 |
 | GET/PUT/DELETE | `/api/admin/shows/{showId}` | 演出详情/改/删 |
 | GET/POST | `/api/admin/shows/{showId}/sessions` | 场次列表/新增 |
+| PUT | `/api/admin/sessions/{sessionId}` | 编辑场次 |
 | POST | `/api/admin/sessions/{sessionId}/pricing-strategies` | 票价策略 |
 | POST | `/api/admin/sessions/{sessionId}/dynamic-pricing-rules` | 动态调价 |
 | PUT | `/api/admin/sessions/{sessionId}/status` | 场次状态 |
+| PUT | `/api/admin/shows/{showId}/audit-status` | 演出审核 |
 | GET/POST | `/api/admin/seat-maps` | 座位图 |
 | GET | `/api/admin/venues` | 场馆列表（启用中） |
 | GET/PUT/DELETE | `/api/admin/seat-maps/{id}` | 座位图 |
