@@ -54,8 +54,8 @@ const SeatSelection = () => {
   );
   const [seatMap, setSeatMap] = useState<SessionSeatMapDto | null>(null);
   const [pricingStrategies, setPricingStrategies] = useState<PricingStrategyDto[]>([]);
-  // 场次选择器的位置提示：sessionId -> { venueName, mapName }
-  const [sessionSeatMapHints, setSessionSeatMapHints] = useState<Record<number, { venueName: string; mapName: string }>>({});
+  // 场次选择器的位置提示：sessionId -> { venueName, seatMapId }（展示“场馆名 + 座位图ID”，不展示座位图名称）
+  const [sessionSeatMapHints, setSessionSeatMapHints] = useState<Record<number, { venueName: string; seatMapId: number }>>({});
 
   // 座位矩阵
   const [seats, setSeats] = useState<SessionSeatMapSeatDto[]>([]);
@@ -70,8 +70,8 @@ const SeatSelection = () => {
       const map = data?.success ? data.data?.seatMap : null;
       if (!map) return;
       const hint = {
-        venueName: map.venueName || `场馆${map.venueId}`,
-        mapName: map.mapName || `座位图#${map.seatMapId}`,
+        venueName: map.venueName || '',
+        seatMapId: Number(map.seatMapId),
       };
       setSessionSeatMapHints((prev) => {
         const next = { ...prev };
@@ -484,7 +484,7 @@ const SeatSelection = () => {
                 </span>
                 {hint && (
                   <span className="session-option-hint">
-                    {hint.venueName} · {hint.mapName}
+                    {[hint.venueName, `座位图 ${hint.seatMapId}`].filter(Boolean).join(' · ')}
                   </span>
                 )}
               </Radio.Button>
@@ -647,8 +647,7 @@ const SeatSelection = () => {
         )}
         {selectedSessionId != null && sessionSeatMapHints[selectedSessionId] && (
           <span style={{ marginLeft: 16, color: '#888' }}>
-            {sessionSeatMapHints[selectedSessionId].venueName} ·{' '}
-            {sessionSeatMapHints[selectedSessionId].mapName}
+            {[sessionSeatMapHints[selectedSessionId].venueName, `座位图 ${sessionSeatMapHints[selectedSessionId].seatMapId}`].filter(Boolean).join(' · ')}
           </span>
         )}
         {fromExchange && (

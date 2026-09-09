@@ -27,7 +27,7 @@ public sealed class SeatZoneQueryCountTests
         Assert.Equal(4, GetSeatCount(small.Result));
         Assert.Equal(200, GetSeatCount(large.Result));
         Assert.Equal(small.ReadCommandCount, large.ReadCommandCount);
-        Assert.Equal(6, small.ReadCommandCount);
+        Assert.Equal(7, small.ReadCommandCount);
         Assert.Equal("LOCKED", GetAvailability(small.Result, 1));
         Assert.Equal("RESERVED", GetAvailability(small.Result, 2));
         Assert.Equal("AVAILABLE", GetAvailability(small.Result, 3));

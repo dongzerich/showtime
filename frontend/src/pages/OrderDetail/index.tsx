@@ -15,7 +15,8 @@ import {
   Empty,
   Select,
 } from 'antd';
-import { orderAPI, refundAPI, exchangeAPI, showAPI, showSessionAPI, sessionAPI } from '@/api/requests';
+import { orderAPI, refundAPI, exchangeAPI, showAPI, showSessionAPI, sessionAPI, ticketAPI } from '@/api/requests';
+import { QRCodeSVG } from 'qrcode.react';
 import type { components } from '@/api/types';
 import type { OrderResponse } from '@/types/api';
 import {
@@ -164,6 +165,19 @@ const OrderDetail = () => {
           })) || [],
         };
         setOrder(orderData);
+
+        // 订单列表接口的电子票摘要不含二维码内容，需按票补齐，供二维码展示/扫码核销
+        if (orderData.tickets.length > 0) {
+          const { data: ticketDetail, error: ticketDetailError } = await ticketAPI.getTickets(orderData.orderId);
+          if (!ticketDetailError && ticketDetail?.success && Array.isArray(ticketDetail.data)) {
+            const tickets = ticketDetail.data.map((ticket: any) => ({
+              ...ticket,
+              eTicketId: Number(ticket.eTicketId),
+              orderItemId: Number(ticket.orderItemId),
+            }));
+            setOrder((prev) => (prev ? { ...prev, tickets } : prev));
+          }
+        }
 
         // 获取场次和演出详情
         if (orderData.sessionId) {
@@ -732,7 +746,13 @@ const OrderDetail = () => {
                     </Tag>
                   </div>
                   {ticket.qrCode && (
-                    <img src={ticket.qrCode} alt="二维码" loading="lazy" decoding="async" className="ticket-qr" />
+                    <QRCodeSVG
+                      value={ticket.qrCode}
+                      size={96}
+                      marginSize={1}
+                      className="ticket-qr"
+                      aria-label="电子票二维码"
+                    />
                   )}
                 </div>
               ))}

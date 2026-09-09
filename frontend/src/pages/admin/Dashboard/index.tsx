@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Spin, message, Button, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Spin, message, Button } from 'antd';
 import {
   ShoppingCartOutlined,
   DollarOutlined,
@@ -165,17 +165,6 @@ const Dashboard = () => {
         <Col span={8}>
           <Card title="订单状态分布" size="small">
             <div ref={statusChartRef} style={{ height: 320 }} />
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={24}>
-          <Card title="演出销量排行" size="small">
-            <Empty
-              description="待后端销量统计接口，暂未实现"
-              style={{ padding: '40px 0' }}
-            />
           </Card>
         </Col>
       </Row>
