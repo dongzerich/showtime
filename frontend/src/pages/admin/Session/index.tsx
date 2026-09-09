@@ -301,9 +301,14 @@ const Session = () => {
         getAdminPricingStrategies(Number(session.sessionId)),
       ])
       const sections = sectionRes.data?.data?.items || []
+      const sectionIds = new Set(sections.map(s => Number(s.seatSectionId)))
       setStrategySections(sections.map(s => ({ seatSectionId: s.seatSectionId, sectionName: s.sectionName || `票区#${s.seatSectionId}` })))
       const list = listRes.data?.data || []
-      const rows: PriceStrategyRow[] = list.map(item => ({
+      // 只加载“票区属于该场次当前座位图”的档位；历史订单引用的旧票区档位（其他座位图）
+      // 已不属于本场次，不参与编辑/回存，避免把脏数据再次提交给后端。
+      const rows: PriceStrategyRow[] = list
+        .filter(item => sectionIds.has(Number(item.seatSectionId)))
+        .map(item => ({
         priceStrategyId: Number(item.priceStrategyId),
         seatSectionId: Number(item.seatSectionId),
         priceType: item.priceType as PriceType,

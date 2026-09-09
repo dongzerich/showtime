@@ -54,6 +54,8 @@ const SeatSelection = () => {
   );
   const [seatMap, setSeatMap] = useState<SessionSeatMapDto | null>(null);
   const [pricingStrategies, setPricingStrategies] = useState<PricingStrategyDto[]>([]);
+  // 场次选择器的位置提示：sessionId -> { venueName, mapName }
+  const [sessionSeatMapHints, setSessionSeatMapHints] = useState<Record<number, { venueName: string; mapName: string }>>({});
 
   // 座位矩阵
   const [seats, setSeats] = useState<SessionSeatMapSeatDto[]>([]);
@@ -62,7 +64,27 @@ const SeatSelection = () => {
   const [submitting, setSubmitting] = useState(false);
 
   // ========== 获取场次列表 ==========
+  const fetchSeatMapHint = async (sessionId: number, relatedSessionIds: number[]) => {
+    try {
+      const { data } = await sessionAPI.getSessionSeatMap(sessionId);
+      const map = data?.success ? data.data?.seatMap : null;
+      if (!map) return;
+      const hint = {
+        venueName: map.venueName || `场馆${map.venueId}`,
+        mapName: map.mapName || `座位图#${map.seatMapId}`,
+      };
+      setSessionSeatMapHints((prev) => {
+        const next = { ...prev };
+        relatedSessionIds.forEach((id) => { next[id] = hint; });
+        return next;
+      });
+    } catch {
+      // 提示失败不影响场次选择
+    }
+  };
+
   const fetchSessions = async () => {
+    setSessionSeatMapHints({});
     try {
       const { data, error } = await showSessionAPI.getShowSessions(Number(eventId));
       if (error) {
@@ -75,6 +97,16 @@ const SeatSelection = () => {
           sessionId: Number(s.sessionId),
         }));
         setSessions(sessions);
+        // 同一座位图只拉一次位置提示，再映射给使用该座位图的全部场次
+        const hintGroups = new Map<number, number[]>();
+        sessions.forEach((s: any) => {
+          const sessionId = Number(s.sessionId);
+          const seatMapId = Number(s.seatMapId);
+          const ids = hintGroups.get(seatMapId) ?? [];
+          ids.push(sessionId);
+          hintGroups.set(seatMapId, ids);
+        });
+        hintGroups.forEach((sessionIds) => void fetchSeatMapHint(sessionIds[0], sessionIds));
 
         // 如果有预选场次，检查是否在列表中
         if (preSelectedSessionId) {
@@ -442,11 +474,22 @@ const SeatSelection = () => {
           onChange={(e) => setSelectedSessionId(e.target.value)}
           buttonStyle="solid"
         >
-          {sessions.map((session) => (
-            <Radio.Button key={session.sessionId} value={session.sessionId}>
-              {new Date(session.startTime).toLocaleString('zh-CN')}
-            </Radio.Button>
-          ))}
+          {sessions.map((session) => {
+            const sessionId = Number(session.sessionId);
+            const hint = sessionSeatMapHints[sessionId];
+            return (
+              <Radio.Button key={sessionId} value={sessionId}>
+                <span className="session-option-time">
+                  {new Date(session.startTime).toLocaleString('zh-CN')}
+                </span>
+                {hint && (
+                  <span className="session-option-hint">
+                    {hint.venueName} · {hint.mapName}
+                  </span>
+                )}
+              </Radio.Button>
+            );
+          })}
         </Radio.Group>
       </div>
     );
@@ -600,6 +643,12 @@ const SeatSelection = () => {
         {seatMap && (
           <span style={{ marginLeft: 16 }}>
             场次: {new Date(seatMap.startTime).toLocaleString('zh-CN')}
+          </span>
+        )}
+        {selectedSessionId != null && sessionSeatMapHints[selectedSessionId] && (
+          <span style={{ marginLeft: 16, color: '#888' }}>
+            {sessionSeatMapHints[selectedSessionId].venueName} ·{' '}
+            {sessionSeatMapHints[selectedSessionId].mapName}
           </span>
         )}
         {fromExchange && (

@@ -19,6 +19,30 @@
   margin: 0 4px;
 }
 
+.session-selector .ant-radio-button-wrapper > span:last-child {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  height: auto;
+  line-height: 1.4;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.session-option-time {
+  font-size: 13px;
+}
+
+.session-option-hint {
+  font-size: 12px;
+  opacity: 0.75;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ========== 座位图画布（按坐标布局） ========== */
 .seat-map-canvas-wrapper {
   background: #fafafa;

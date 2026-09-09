@@ -16561,6 +16561,7 @@
         "required": [
           "seatMapId",
           "venueId",
+          "venueName",
           "mapCode",
           "mapName",
           "mapVersion",
@@ -16587,6 +16588,9 @@
               "string"
             ],
             "format": "int64"
+          },
+          "venueName": {
+            "type": "string"
           },
           "mapCode": {
             "type": "string"

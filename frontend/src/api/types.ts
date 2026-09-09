@@ -7687,6 +7687,7 @@ export interface components {
             seatMapId: number | string;
             /** Format: int64 */
             venueId: number | string;
+            venueName: string;
             mapCode: string;
             mapName: string;
             mapVersion: string;
